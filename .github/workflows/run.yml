@@ -1,0 +1,24 @@
+name: "run"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "releases/*"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./
+        with:
+          host: ${{ secrets.HOST }}
+          key: ${{ secrets.KEY }}
+          user: ${{ secrets.USER }}
+          envs: ${{ toJson(secrets) }}
+          ignoredEnvs: github_token
+          command: |
+            ls
+            mkdir $DIRECTORY
+            ls

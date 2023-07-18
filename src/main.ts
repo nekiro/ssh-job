@@ -1,40 +1,60 @@
-import core from "@actions/core";
-import {parse, validate} from "./config";
+import * as core from "@actions/core";
+import {ConfigManager} from "./ConfigManager";
 import {NodeSSH, Config} from "node-ssh";
 
 async function run(): Promise<void> {
 	try {
-		const config = parse();
+		const configManager = new ConfigManager();
 
-		// validate if enough credentials is provided
-		validate(config);
+		const sshConfig: Config = {
+			host: configManager.config.host,
+			port: configManager.config.port,
+			username: configManager.config.user,
+		};
 
-		const sshConfig: Config = {host: config.host, port: config.port};
-
-		if (config.key) {
-			sshConfig.privateKey = config.key;
-		} else if (config.keyPath) {
-			sshConfig.privateKeyPath = config.keyPath;
+		if (configManager.config.key) {
+			sshConfig.privateKey = configManager.config.key;
 		} else {
-			sshConfig.username = config.username;
 			sshConfig.password = sshConfig.password;
 		}
 
 		// initlaize ssh
-		const ssh = await new NodeSSH().connect(sshConfig);
+		const ssh = new NodeSSH();
+		await ssh.connect(sshConfig);
 
-		await ssh.exec(config.command.join("\n"), [], {
-			onStdout(chunk) {
-				console.log("stdoutChunk", chunk.toString("utf8"));
-			},
-			onStderr(chunk) {
-				console.log("stderrChunk", chunk.toString("utf8"));
+		core.info("Connection estabilished...");
+
+		core.startGroup("CMD output");
+
+		// ignore action inputs
+		const envs = configManager.config.envs.filter(({key}) =>
+			ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
+		);
+
+		// export provided envs
+		configManager.config.command.unshift(`export ${envs.map(({key, value}) => `${key}="${value}"`).join(" ")}`);
+
+		let error: string | undefined;
+
+		core.info(`Executing commands...`);
+
+		await ssh.execCommand(configManager.config.command.join(";"), {
+			onStdout: chunk => core.info(chunk.toString("utf8")),
+			onStderr: chunk => {
+				error = chunk.toString("utf8");
 			},
 		});
-	} catch (error) {
-		if (error instanceof Error) {
-			core.setFailed(error.message);
+
+		if (error) {
+			ssh.dispose();
+			throw error;
 		}
+
+		core.endGroup();
+
+		ssh.dispose();
+	} catch (error) {
+		core.setFailed(error instanceof Error ? error.message : String(error));
 	}
 }
 

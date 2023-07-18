@@ -1,0 +1,17 @@
+name: "test-build"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "releases/*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          npm install
+      - run: |
+          npm run build && npm run test && npm run lint && npm run format-check

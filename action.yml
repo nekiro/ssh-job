@@ -11,16 +11,14 @@ inputs:
     default: "22"
   key:
     description: "Ssh private key used to connect to target machine"
-  key_path:
-    description: "Path to Ssh private key used to connect to target machine"
-  username:
+  user:
     description: "Ssh user"
   password:
     description: "Ssh password"
   envs:
     description: "Environment variables passed to the shell script"
-  debug:
-    description: "Enable debug mode"
+  ignoredEnvs:
+    description: "Environment variables that are ommited from passing to the shell"
   command:
     description: "Bash commands ran on target machine"
 
