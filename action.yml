@@ -1,11 +1,29 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: "ssh-job"
+description: "Execute any script through ssh"
+author: "Marcin Jałocha"
 inputs:
-  milliseconds: # change this
+  host:
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+    description: "Target machine hostname or ip"
+  port:
+    required: true
+    description: "Port to use while connecting"
+    default: "22"
+  key:
+    description: "Ssh private key used to connect to target machine"
+  key_path:
+    description: "Path to Ssh private key used to connect to target machine"
+  username:
+    description: "Ssh user"
+  password:
+    description: "Ssh password"
+  envs:
+    description: "Environment variables passed to the shell script"
+  debug:
+    description: "Enable debug mode"
+  command:
+    description: "Bash commands ran on target machine"
+
 runs:
-  using: 'node16'
-  main: 'dist/index.js'
+  using: "node16"
+  main: "dist/index.js"
