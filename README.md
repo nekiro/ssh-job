@@ -23,14 +23,15 @@ Execute any command on target machine easily
 Authorize with ssh private key and execute some commands
 
 ```yml
-- uses: ./
+- name: create-directory
+  uses: nekiro/ssh-job@v1.0.0
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
     user: ${{ secrets.USER }}
     command: |
       ls
-	  mkdir dir
+      mkdir dir
 ```
 
 It's possible to automatically pass github secrets to the shell script, it allows you to use provided secrets directly in the bash script.
@@ -40,7 +41,8 @@ In this example, we have few secrets for example `DIRECTORY`, we want to pass al
 Keep in mind action options are not exported by default, so you wont be able to access HOST, KEY etc.
 
 ```yml
-- uses: ./
+- name: create-directory
+  uses: nekiro/ssh-job@v1.0.0
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
