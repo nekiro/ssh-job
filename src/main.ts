@@ -26,10 +26,12 @@ async function run(): Promise<void> {
 
 		core.startGroup("CMD output");
 
-		// ignore action inputs
-		const envs = configManager.config.envs.filter(({key}) =>
-			ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
-		);
+		// ignore action inputs when needed
+		const envs = configManager.config.exportActionOptions
+			? configManager.config.envs
+			: configManager.config.envs.filter(({key}) =>
+					ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
+			  );
 
 		// export provided envs
 		configManager.config.command.unshift(`export ${envs.map(({key, value}) => `${key}="${value}"`).join(" ")}`);

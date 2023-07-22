@@ -22,6 +22,9 @@ inputs:
   command:
     required: true
     description: "Bash commands ran on target machine"
+  exportActionOptions:
+    required: false
+    description: "Export all action options to shell script"
 
 runs:
   using: "node16"

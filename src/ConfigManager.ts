@@ -10,14 +10,24 @@ export interface ConfigInterface {
 	envs: {key: string; value: string}[];
 	ignoredEnvs: string[];
 	command: string[];
+	exportActionOptions: boolean;
 }
 
 export class ConfigManager {
-	public static readonly exportIgnoredEnvs = ["host", "key", "user", "password", "command", "ignoredEnvs", "envs"];
+	public static readonly exportIgnoredEnvs = [
+		"host",
+		"key",
+		"user",
+		"password",
+		"command",
+		"ignoredEnvs",
+		"envs",
+		"exportActionOptions",
+	];
 
 	public readonly config: ConfigInterface;
 
-	public constructor() {
+	public constructor(validate = true) {
 		const config: ConfigInterface = {
 			host: InputParser.getString("host"),
 			port: InputParser.getNumber("port"),
@@ -27,6 +37,7 @@ export class ConfigManager {
 			envs: [],
 			command: InputParser.getMultilineString("command"),
 			ignoredEnvs: InputParser.getStringArray("ignoredEnvs"),
+			exportActionOptions: InputParser.getBoolean("exportActionOptions", false),
 		};
 
 		try {
@@ -46,24 +57,26 @@ export class ConfigManager {
 
 		this.config = config;
 
-		this.validate();
+		if (validate) {
+			this.validate();
+		}
 	}
 
 	public validate = (): void => {
 		if (!this.config.host) {
-			throw Error("Missing host");
+			throw new Error("Missing host");
 		}
 
 		if (!this.config.user) {
-			throw Error("Missing user");
+			throw new Error("Missing user");
 		}
 
 		if (!this.config.password && !this.config.key) {
-			throw Error("Missing credentials, please provide at least one way to authenticate");
+			throw new Error("Missing credentials, please provide at least one way to authenticate");
 		}
 
-		if (!this.config.command) {
-			throw Error("Provide command to execute when connected");
+		if (this.config.command.length === 0) {
+			throw new Error("Provide command to execute when connected");
 		}
 	};
 }

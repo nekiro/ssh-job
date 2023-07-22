@@ -33,11 +33,13 @@ export class InputParser {
 		return envs;
 	};
 
-	public static getBoolean = (name: string): boolean => {
-		const value = core.getInput(name);
+	public static getBoolean = (name: string, defaultValue?: boolean): boolean => {
+		let value = core.getInput(name);
 
 		if (value.length !== 0 && !validator.isBoolean(value, {loose: false})) {
 			throw Error(`Invalid argument value for ${name}`);
+		} else if (value.length === 0 && defaultValue) {
+			value = String(defaultValue);
 		}
 
 		return validator.toBoolean(value, true);

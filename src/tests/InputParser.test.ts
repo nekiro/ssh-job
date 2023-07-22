@@ -64,15 +64,16 @@ describe("InputParser", () => {
 		{input: "false", output: false},
 		{input: "1", output: true},
 		{input: "0", output: false},
-	])("getBoolean should return proper output for given input", ({input, output}) => {
+		{input: "", defautValue: true},
+	])("getBoolean should return proper output for given input", ({input, output, defautValue}) => {
 		//given
 		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
 
 		//when
-		const result = InputParser.getBoolean("foo");
+		const result = InputParser.getBoolean("foo", defautValue);
 
 		//then
-		expect(result).toBe(output);
+		expect(result).toBe(output ?? defautValue);
 	});
 
 	test.each([
