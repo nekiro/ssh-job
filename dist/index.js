@@ -243,11 +243,13 @@ function run() {
             // export provided envs
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
             core.info(`Executing commands...`);
+            core.info("########## START ###########");
             yield ssh.execCommand(configManager.config.command.join(";"), {
-                onStdout: chunk => console.log("out:", chunk.toString("utf8")),
-                onStderr: chunk => console.log("err:", chunk.toString("utf8")),
+                onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
+                onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
             });
-            core.info("Done executing all commands!");
+            core.info("########### END ##########");
+            core.info("Executed all commands successfully! 🚀");
         }
         catch (error) {
             core.setFailed(error instanceof Error ? error.message : String(error));
