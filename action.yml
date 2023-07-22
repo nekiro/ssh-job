@@ -20,6 +20,7 @@ inputs:
   ignoredEnvs:
     description: "Environment variables that are ommited from passing to the shell"
   command:
+    required: true
     description: "Bash commands ran on target machine"
 
 runs:
