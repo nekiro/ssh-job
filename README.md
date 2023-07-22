@@ -2,7 +2,9 @@
 
 # ssh-job
 
-Execute any command on target machine easily
+Easier automated deployment through ssh via Github Action. 🚀
+
+Execute commands on target server with few easy steps :)
 
 ## Options
 
@@ -50,3 +52,8 @@ Keep in mind action options are not exported by default, so you wont be able to 
     envs: ${{ toJson(secrets) }}
     command: mkdir $DIRECTORY
 ```
+
+## Contribution
+Want to improve this project or found a bug? Feel free to open pull requests and create issues.
+
+If you are not technical or simply don't have time, there is always a way to give back by clicking on the sponsor tab and sending some $, everything is appreciated :D
