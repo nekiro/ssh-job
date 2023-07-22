@@ -24,7 +24,7 @@ Authorize with ssh private key and execute some commands
 
 ```yml
 - name: create-directory
-  uses: nekiro/ssh-job@v1.0.0
+  uses: nekiro/ssh-job@main
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
@@ -42,7 +42,7 @@ Keep in mind action options are not exported by default, so you wont be able to 
 
 ```yml
 - name: create-directory
-  uses: nekiro/ssh-job@v1.0.0
+  uses: nekiro/ssh-job@main
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
