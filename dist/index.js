@@ -219,6 +219,7 @@ const ConfigManager_1 = __nccwpck_require__(1298);
 const node_ssh_1 = __nccwpck_require__(7334);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
+        const ssh = new node_ssh_1.NodeSSH();
         try {
             const configManager = new ConfigManager_1.ConfigManager();
             const sshConfig = {
@@ -233,33 +234,26 @@ function run() {
                 sshConfig.password = sshConfig.password;
             }
             // initlaize ssh
-            const ssh = new node_ssh_1.NodeSSH();
             yield ssh.connect(sshConfig);
             core.info("Connection estabilished...");
-            core.startGroup("CMD output");
             // ignore action inputs when needed
             const envs = configManager.config.exportActionOptions
                 ? configManager.config.envs
                 : configManager.config.envs.filter(({ key }) => ConfigManager_1.ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
             // export provided envs
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
-            let error;
             core.info(`Executing commands...`);
             yield ssh.execCommand(configManager.config.command.join(";"), {
-                onStdout: chunk => core.info(chunk.toString("utf8")),
-                onStderr: chunk => {
-                    error = chunk.toString("utf8");
-                },
+                onStdout: chunk => console.log("out:", chunk.toString("utf8")),
+                onStderr: chunk => console.log("err:", chunk.toString("utf8")),
             });
-            if (error) {
-                ssh.dispose();
-                throw error;
-            }
-            core.endGroup();
-            ssh.dispose();
+            core.info("Done executing all commands!");
         }
         catch (error) {
             core.setFailed(error instanceof Error ? error.message : String(error));
+        }
+        finally {
+            ssh.dispose();
         }
     });
 }

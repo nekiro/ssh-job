@@ -3,6 +3,8 @@ import {ConfigManager} from "./ConfigManager";
 import {NodeSSH, Config} from "node-ssh";
 
 async function run(): Promise<void> {
+	const ssh = new NodeSSH();
+
 	try {
 		const configManager = new ConfigManager();
 
@@ -19,12 +21,9 @@ async function run(): Promise<void> {
 		}
 
 		// initlaize ssh
-		const ssh = new NodeSSH();
 		await ssh.connect(sshConfig);
 
 		core.info("Connection estabilished...");
-
-		core.startGroup("CMD output");
 
 		// ignore action inputs when needed
 		const envs = configManager.config.exportActionOptions
@@ -36,27 +35,18 @@ async function run(): Promise<void> {
 		// export provided envs
 		configManager.config.command.unshift(`export ${envs.map(({key, value}) => `${key}="${value}"`).join(" ")}`);
 
-		let error: string | undefined;
-
 		core.info(`Executing commands...`);
 
 		await ssh.execCommand(configManager.config.command.join(";"), {
-			onStdout: chunk => core.info(chunk.toString("utf8")),
-			onStderr: chunk => {
-				error = chunk.toString("utf8");
-			},
+			onStdout: chunk => console.log("out:", chunk.toString("utf8")),
+			onStderr: chunk => console.log("err:", chunk.toString("utf8")),
 		});
 
-		if (error) {
-			ssh.dispose();
-			throw error;
-		}
-
-		core.endGroup();
-
-		ssh.dispose();
+		core.info("Done executing all commands!");
 	} catch (error) {
 		core.setFailed(error instanceof Error ? error.message : String(error));
+	} finally {
+		ssh.dispose();
 	}
 }
 
