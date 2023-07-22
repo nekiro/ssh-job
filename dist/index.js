@@ -34,19 +34,19 @@ exports.ConfigManager = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const InputParser_1 = __nccwpck_require__(366);
 class ConfigManager {
-    constructor() {
+    constructor(validate = true) {
         this.validate = () => {
             if (!this.config.host) {
-                throw Error("Missing host");
+                throw new Error("Missing host");
             }
             if (!this.config.user) {
-                throw Error("Missing user");
+                throw new Error("Missing user");
             }
             if (!this.config.password && !this.config.key) {
-                throw Error("Missing credentials, please provide at least one way to authenticate");
+                throw new Error("Missing credentials, please provide at least one way to authenticate");
             }
-            if (!this.config.command) {
-                throw Error("Provide command to execute when connected");
+            if (this.config.command.length === 0) {
+                throw new Error("Provide command to execute when connected");
             }
         };
         const config = {
@@ -58,6 +58,7 @@ class ConfigManager {
             envs: [],
             command: InputParser_1.InputParser.getMultilineString("command"),
             ignoredEnvs: InputParser_1.InputParser.getStringArray("ignoredEnvs"),
+            exportActionOptions: InputParser_1.InputParser.getBoolean("exportActionOptions", false),
         };
         try {
             const rawEnvs = Object.entries(InputParser_1.InputParser.getJsonFormatted("envs"));
@@ -74,11 +75,22 @@ class ConfigManager {
             throw new Error("Envs variable must be a json formatted string, make sure you pass correct values");
         }
         this.config = config;
-        this.validate();
+        if (validate) {
+            this.validate();
+        }
     }
 }
 exports.ConfigManager = ConfigManager;
-ConfigManager.exportIgnoredEnvs = ["host", "key", "user", "password", "command", "ignoredEnvs", "envs"];
+ConfigManager.exportIgnoredEnvs = [
+    "host",
+    "key",
+    "user",
+    "password",
+    "command",
+    "ignoredEnvs",
+    "envs",
+    "exportActionOptions",
+];
 
 
 /***/ }),
@@ -143,10 +155,13 @@ InputParser.getStringArray = (name) => {
     }
     return envs;
 };
-InputParser.getBoolean = (name) => {
-    const value = core.getInput(name);
+InputParser.getBoolean = (name, defaultValue) => {
+    let value = core.getInput(name);
     if (value.length !== 0 && !validator_1.default.isBoolean(value, { loose: false })) {
         throw Error(`Invalid argument value for ${name}`);
+    }
+    else if (value.length === 0 && defaultValue) {
+        value = String(defaultValue);
     }
     return validator_1.default.toBoolean(value, true);
 };
@@ -222,8 +237,10 @@ function run() {
             yield ssh.connect(sshConfig);
             core.info("Connection estabilished...");
             core.startGroup("CMD output");
-            // ignore action inputs
-            const envs = configManager.config.envs.filter(({ key }) => ConfigManager_1.ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
+            // ignore action inputs when needed
+            const envs = configManager.config.exportActionOptions
+                ? configManager.config.envs
+                : configManager.config.envs.filter(({ key }) => ConfigManager_1.ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
             // export provided envs
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
             let error;
