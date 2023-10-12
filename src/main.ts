@@ -38,10 +38,14 @@ async function run(): Promise<void> {
 		core.info(`Executing commands...`);
 		core.info("########## START ###########");
 
-		await ssh.execCommand(configManager.config.command.join(";"), {
+		const response = await ssh.execCommand(configManager.config.command.join(";"), {
 			onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
 			onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
 		});
+
+		if (response.code != 0) {
+			throw new Error("Command failed");
+		}
 
 		core.info("########### END ##########");
 		core.info("Executed all commands successfully! 🚀");

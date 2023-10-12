@@ -1,6 +1,6 @@
 {
 	"name": "ssh-job",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"private": true,
 	"description": "Github Action that allows to connect to server by ssh and execute actions",
 	"main": "lib/main.js",

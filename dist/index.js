@@ -244,10 +244,13 @@ function run() {
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
             core.info(`Executing commands...`);
             core.info("########## START ###########");
-            yield ssh.execCommand(configManager.config.command.join(";"), {
+            const response = yield ssh.execCommand(configManager.config.command.join(";"), {
                 onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
                 onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
             });
+            if (response.code != 0) {
+                throw new Error("Command failed");
+            }
             core.info("########### END ##########");
             core.info("Executed all commands successfully! 🚀");
         }
