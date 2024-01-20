@@ -9,10 +9,11 @@ Execute commands on target server with few easy steps :)
 ## Options
 
 | Param               | default | required | description                                                                                                  |
-| :------------------ | :-----: | -------: | ------------------------------------------------------------------------------------------------------------ |
+| :------------------ | :-----: |---------:|--------------------------------------------------------------------------------------------------------------|
 | host                |   n/a   |     true | Host to connect to                                                                                           |
 | port                |   22    |    false | Port to connect to                                                                                           |
 | key                 |   n/a   |     true | Private key used for authorization                                                                           |
+| passphrase          |   n/a   |    false | Passphrase used to decrypt key                                                                               |
 | user                |   n/a   |     true | User used for authorization                                                                                  |
 | password            |   n/a   |    false | Password used for authorization                                                                              |
 | envs                |   n/a   |    false | Json serialized secrets exported to shell                                                                    |

@@ -5,6 +5,7 @@ export interface ConfigInterface {
 	host: string;
 	port: number;
 	key: string;
+	passphrase: string;
 	user: string;
 	password: string;
 	envs: {key: string; value: string}[];
@@ -32,6 +33,7 @@ export class ConfigManager {
 			host: InputParser.getString("host"),
 			port: InputParser.getNumber("port"),
 			key: InputParser.getString("key"),
+			passphrase: InputParser.getString("passphrase"),
 			user: InputParser.getString("user"),
 			password: InputParser.getString("password"),
 			envs: [],
