@@ -53,6 +53,7 @@ class ConfigManager {
             host: InputParser_1.InputParser.getString("host"),
             port: InputParser_1.InputParser.getNumber("port"),
             key: InputParser_1.InputParser.getString("key"),
+            passphrase: InputParser_1.InputParser.getString("passphrase"),
             user: InputParser_1.InputParser.getString("user"),
             password: InputParser_1.InputParser.getString("password"),
             envs: [],
@@ -229,6 +230,9 @@ function run() {
             };
             if (configManager.config.key) {
                 sshConfig.privateKey = configManager.config.key;
+                if (configManager.config.passphrase) {
+                    sshConfig.passphrase = configManager.config.passphrase;
+                }
             }
             else {
                 sshConfig.password = configManager.config.password;
@@ -3320,19 +3324,6 @@ module.exports = {
       hash: bcrypt_hash,
       pbkdf: bcrypt_pbkdf
 };
-
-
-/***/ }),
-
-/***/ 4137:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-const binding = __nccwpck_require__(4240);
-
-module.exports = binding.getCPUInfo;
 
 
 /***/ }),
@@ -15822,7 +15813,7 @@ const crypto = __nccwpck_require__(6113);
 
 let cpuInfo;
 try {
-  cpuInfo = __nccwpck_require__(4137)();
+  cpuInfo = __nccwpck_require__(7295)();
 } catch {}
 
 const { bindingAvailable, CIPHER_INFO, MAC_INFO } = __nccwpck_require__(5708);
@@ -16209,7 +16200,7 @@ let AESGCMDecipher;
 let ChaChaPolyDecipher;
 let GenericDecipher;
 try {
-  binding = __nccwpck_require__(9041);
+  binding = __nccwpck_require__(9623);
   ({ AESGCMCipher, ChaChaPolyCipher, GenericCipher,
      AESGCMDecipher, ChaChaPolyDecipher, GenericDecipher } = binding);
 } catch {}
@@ -36145,17 +36136,19 @@ module.exports["default"] = exports.default;
 
 /***/ }),
 
-/***/ 4240:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ 9623:
+/***/ ((module) => {
 
-module.exports = require(__nccwpck_require__.ab + "build/Release/cpufeatures.node")
+module.exports = eval("require")("./crypto/build/Release/sshcrypto.node");
+
 
 /***/ }),
 
-/***/ 9041:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ 7295:
+/***/ ((module) => {
 
-module.exports = require(__nccwpck_require__.ab + "lib/protocol/crypto/build/Release/sshcrypto.node")
+module.exports = eval("require")("cpu-features");
+
 
 /***/ }),
 

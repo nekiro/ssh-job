@@ -16,6 +16,9 @@ async function run(): Promise<void> {
 
 		if (configManager.config.key) {
 			sshConfig.privateKey = configManager.config.key;
+			if (configManager.config.passphrase) {
+				sshConfig.passphrase = configManager.config.passphrase;
+			}
 		} else {
 			sshConfig.password = configManager.config.password;
 		}
