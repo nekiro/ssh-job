@@ -11,6 +11,9 @@ inputs:
     default: "22"
   key:
     description: "Ssh private key used to connect to target machine"
+  passphrase:
+    required: false
+    description: "Passphrase for the private key"
   user:
     description: "Ssh user"
   password:
