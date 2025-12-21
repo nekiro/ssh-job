@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import {ConfigManager} from "./ConfigManager";
-import {NodeSSH, Config} from "node-ssh";
+import {NodeSSH, Config, SSHExecCommandOptions} from "node-ssh";
 
 async function run(): Promise<void> {
 	const ssh = new NodeSSH();
@@ -29,33 +29,47 @@ async function run(): Promise<void> {
 		core.info("Connection estabilished...");
 
 		// ignore action inputs when needed
+		const ignoredEnvKeys = new Set(ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
 		const envs = configManager.config.exportActionOptions
 			? configManager.config.envs
-			: configManager.config.envs.filter(
-					({key}) =>
-						!ConfigManager.exportIgnoredEnvs.some(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
-			  );
+			: configManager.config.envs.filter(({key}) => !ignoredEnvKeys.has(key.toLowerCase()));
 
-		// export provided envs
-		configManager.config.command.unshift(`export ${envs.map(({key, value}) => `${key}="${value}"`).join(" ")}`);
+		const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
+		const exportLines = envs.map(({key, value}) => `export ${key}=${shellQuote(value)}`);
+		const scriptLines = ["set -euo pipefail", ...exportLines, ...configManager.config.command];
+		const script = `${scriptLines.join("\n")}\n`;
 
 		core.info(`Executing commands...`);
 		core.info("########## START ###########");
 
-		const execCommandOptions: {
-			onStdout: (chunk: Buffer) => void;
-			onStderr: (chunk: Buffer) => void;
-			execOptions?: {pty: true};
-		} = {
-			onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
-			onStderr: chunk => process.stderr.write(chunk.toString("utf8")),
+		let sawStdout = false;
+		let sawStderr = false;
+		const execCommandOptions: SSHExecCommandOptions = {
+			onStdout: chunk => {
+				sawStdout = true;
+				process.stdout.write(chunk.toString("utf8"));
+			},
+			onStderr: chunk => {
+				sawStderr = true;
+				process.stderr.write(chunk.toString("utf8"));
+			},
 		};
 
 		if (configManager.config.tty) {
 			execCommandOptions.execOptions = {pty: true};
 		}
 
-		const response = await ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
+		const response = await ssh.execCommand("bash --noprofile --norc -c 'source /dev/stdin'", {
+			...execCommandOptions,
+			stdin: script,
+		});
+
+		if (!sawStdout && response.stdout) {
+			core.info(response.stdout);
+		}
+		if (!sawStderr && response.stderr) {
+			core.error(response.stderr);
+		}
 
 		if (response.code != 0) {
 			const stderr = response.stderr?.trim();

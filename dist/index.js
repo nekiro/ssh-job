@@ -244,21 +244,38 @@ function run() {
             yield ssh.connect(sshConfig);
             core.info("Connection estabilished...");
             // ignore action inputs when needed
+            const ignoredEnvKeys = new Set(ConfigManager_1.ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
             const envs = configManager.config.exportActionOptions
                 ? configManager.config.envs
-                : configManager.config.envs.filter(({ key }) => !ConfigManager_1.ConfigManager.exportIgnoredEnvs.some(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
-            // export provided envs
-            configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
+                : configManager.config.envs.filter(({ key }) => !ignoredEnvKeys.has(key.toLowerCase()));
+            const shellQuote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
+            const exportLines = envs.map(({ key, value }) => `export ${key}=${shellQuote(value)}`);
+            const scriptLines = ["set -euo pipefail", ...exportLines, ...configManager.config.command];
+            const script = `${scriptLines.join("\n")}\n`;
             core.info(`Executing commands...`);
             core.info("########## START ###########");
+            let sawStdout = false;
+            let sawStderr = false;
             const execCommandOptions = {
-                onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
-                onStderr: chunk => process.stderr.write(chunk.toString("utf8")),
+                onStdout: chunk => {
+                    sawStdout = true;
+                    process.stdout.write(chunk.toString("utf8"));
+                },
+                onStderr: chunk => {
+                    sawStderr = true;
+                    process.stderr.write(chunk.toString("utf8"));
+                },
             };
             if (configManager.config.tty) {
                 execCommandOptions.execOptions = { pty: true };
             }
-            const response = yield ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
+            const response = yield ssh.execCommand("bash --noprofile --norc -c 'source /dev/stdin'", Object.assign(Object.assign({}, execCommandOptions), { stdin: script }));
+            if (!sawStdout && response.stdout) {
+                core.info(response.stdout);
+            }
+            if (!sawStderr && response.stderr) {
+                core.error(response.stderr);
+            }
             if (response.code != 0) {
                 const stderr = (_a = response.stderr) === null || _a === void 0 ? void 0 : _a.trim();
                 throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");

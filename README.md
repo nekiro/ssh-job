@@ -6,6 +6,8 @@ Easier automated deployment through ssh via Github Action. 🚀
 
 Execute commands on target server with few easy steps :)
 
+Commands are executed by `bash --noprofile --norc -c 'source /dev/stdin'` with `set -euo pipefail`.
+
 ## Options
 
 | Param               | default | required | description                                                                                                  |
