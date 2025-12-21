@@ -12,6 +12,7 @@ export interface ConfigInterface {
 	ignoredEnvs: string[];
 	command: string[];
 	exportActionOptions: boolean;
+	tty: boolean;
 }
 
 export class ConfigManager {
@@ -24,6 +25,7 @@ export class ConfigManager {
 		"ignoredEnvs",
 		"envs",
 		"exportActionOptions",
+		"tty",
 	];
 
 	public readonly config: ConfigInterface;
@@ -40,6 +42,7 @@ export class ConfigManager {
 			command: InputParser.getMultilineString("command"),
 			ignoredEnvs: InputParser.getStringArray("ignoredEnvs"),
 			exportActionOptions: InputParser.getBoolean("exportActionOptions", false),
+			tty: InputParser.getBoolean("tty", false),
 		};
 
 		try {

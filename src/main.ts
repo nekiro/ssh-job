@@ -41,10 +41,20 @@ async function run(): Promise<void> {
 		core.info(`Executing commands...`);
 		core.info("########## START ###########");
 
-		const response = await ssh.execCommand(configManager.config.command.join(" && "), {
+		const execCommandOptions: {
+			onStdout: (chunk: Buffer) => void;
+			onStderr: (chunk: Buffer) => void;
+			execOptions?: {pty: true};
+		} = {
 			onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
 			onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
-		});
+		};
+
+		if (configManager.config.tty) {
+			execCommandOptions.execOptions = {pty: true};
+		}
+
+		const response = await ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
 
 		if (response.code != 0) {
 			throw new Error("Command failed");

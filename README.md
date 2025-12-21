@@ -20,6 +20,7 @@ Execute commands on target server with few easy steps :)
 | ignoredEnvs         |   n/a   |  false   | List of comma separated envs to ignore when exporting to shell                                               |
 | command             |   n/a   |   true   | Command/s or script to execute                                                                               |
 | exportActionOptions |  false  |   true   | Export action options, this is handy when you want to access HOST, USER or any other options in shell script |
+| tty                 |  false  |  false   | Allocate a pseudo-terminal (TTY) for the SSH command                                                         |
 
 ## Examples
 

@@ -28,6 +28,10 @@ inputs:
   exportActionOptions:
     required: false
     description: "Export all action options to shell script"
+  tty:
+    required: false
+    default: "false"
+    description: "Allocate a pseudo-terminal (TTY) for the SSH command"
 
 runs:
   using: "node20"

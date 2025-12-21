@@ -60,6 +60,7 @@ class ConfigManager {
             command: InputParser_1.InputParser.getMultilineString("command"),
             ignoredEnvs: InputParser_1.InputParser.getStringArray("ignoredEnvs"),
             exportActionOptions: InputParser_1.InputParser.getBoolean("exportActionOptions", false),
+            tty: InputParser_1.InputParser.getBoolean("tty", false),
         };
         try {
             const rawEnvs = Object.entries(InputParser_1.InputParser.getJsonFormatted("envs"));
@@ -91,6 +92,7 @@ ConfigManager.exportIgnoredEnvs = [
     "ignoredEnvs",
     "envs",
     "exportActionOptions",
+    "tty",
 ];
 
 
@@ -248,10 +250,14 @@ function run() {
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
             core.info(`Executing commands...`);
             core.info("########## START ###########");
-            const response = yield ssh.execCommand(configManager.config.command.join(" && "), {
+            const execCommandOptions = {
                 onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
                 onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
-            });
+            };
+            if (configManager.config.tty) {
+                execCommandOptions.execOptions = { pty: true };
+            }
+            const response = yield ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
             if (response.code != 0) {
                 throw new Error("Command failed");
             }
