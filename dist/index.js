@@ -221,6 +221,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const ConfigManager_1 = __nccwpck_require__(1298);
 const node_ssh_1 = __nccwpck_require__(7334);
 function run() {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const ssh = new node_ssh_1.NodeSSH();
         try {
@@ -245,21 +246,22 @@ function run() {
             // ignore action inputs when needed
             const envs = configManager.config.exportActionOptions
                 ? configManager.config.envs
-                : configManager.config.envs.filter(({ key }) => ConfigManager_1.ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
+                : configManager.config.envs.filter(({ key }) => !ConfigManager_1.ConfigManager.exportIgnoredEnvs.some(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase())));
             // export provided envs
             configManager.config.command.unshift(`export ${envs.map(({ key, value }) => `${key}="${value}"`).join(" ")}`);
             core.info(`Executing commands...`);
             core.info("########## START ###########");
             const execCommandOptions = {
                 onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
-                onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
+                onStderr: chunk => process.stderr.write(chunk.toString("utf8")),
             };
             if (configManager.config.tty) {
                 execCommandOptions.execOptions = { pty: true };
             }
             const response = yield ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
             if (response.code != 0) {
-                throw new Error("Command failed");
+                const stderr = (_a = response.stderr) === null || _a === void 0 ? void 0 : _a.trim();
+                throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");
             }
             core.info("########### END ##########");
             core.info("Executed all commands successfully! 🚀");

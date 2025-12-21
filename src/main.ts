@@ -31,8 +31,9 @@ async function run(): Promise<void> {
 		// ignore action inputs when needed
 		const envs = configManager.config.exportActionOptions
 			? configManager.config.envs
-			: configManager.config.envs.filter(({key}) =>
-					ConfigManager.exportIgnoredEnvs.filter(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
+			: configManager.config.envs.filter(
+					({key}) =>
+						!ConfigManager.exportIgnoredEnvs.some(ignoredKey => key.toLowerCase().includes(ignoredKey.toLowerCase()))
 			  );
 
 		// export provided envs
@@ -47,7 +48,7 @@ async function run(): Promise<void> {
 			execOptions?: {pty: true};
 		} = {
 			onStdout: chunk => process.stdout.write(chunk.toString("utf8")),
-			onStderr: chunk => process.stdout.write(chunk.toString("utf8")),
+			onStderr: chunk => process.stderr.write(chunk.toString("utf8")),
 		};
 
 		if (configManager.config.tty) {
@@ -57,7 +58,8 @@ async function run(): Promise<void> {
 		const response = await ssh.execCommand(configManager.config.command.join(" && "), execCommandOptions);
 
 		if (response.code != 0) {
-			throw new Error("Command failed");
+			const stderr = response.stderr?.trim();
+			throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");
 		}
 
 		core.info("########### END ##########");
