@@ -25913,13 +25913,20 @@ var import_validator = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 	module.exports = exports.default;
 	module.exports.default = exports.default;
 })))(), 1);
-/** Reads an input that holds a json object, an empty input gives an empty object. */
+const isJsonObject = (value) => {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+/**
+* Reads an input that holds a json object, or a json array of objects that are merged into one.
+* In an array a later object wins when the same key is in more than one. An empty input gives an empty object.
+*/
 const getJsonInput = (name) => {
 	const value = getInput(name);
 	if (value.length === 0) return {};
 	const parsed = JSON.parse(value);
-	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw Error(`Invalid argument value for ${name}, pass a json object`);
-	return parsed;
+	const objects = Array.isArray(parsed) ? parsed : [parsed];
+	if (!objects.every(isJsonObject)) throw Error(`Invalid argument value for ${name}, pass a json object or an array of json objects`);
+	return Object.fromEntries(objects.flatMap((object) => Object.entries(object)));
 };
 /** Reads an input that holds a comma separated list. */
 const getListInput = (name) => {
