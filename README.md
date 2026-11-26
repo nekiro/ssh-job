@@ -24,6 +24,8 @@ Commands are executed by `bash --noprofile --norc -c 'source /dev/stdin'` with `
 | command             |   n/a   |   true   | Command/s or script to execute                                                                               |
 | exportActionOptions |  false  |  false   | Export action options, this is handy when you want to access HOST, USER or any other options in shell script |
 | tty                 |  false  |  false   | Allocate a pseudo-terminal (TTY) for the SSH command                                                         |
+| connectTimeout      |   20    |  false   | Seconds to wait for the SSH connection and authentication                                                    |
+| timeout             |    0    |  false   | Seconds to wait for the command to finish, 0 disables it. The connection is closed when the time runs out    |
 
 ## Host key verification
 

@@ -155,7 +155,35 @@ describe("ConfigManager", () => {
 		expect(() => new ConfigManager()).toThrow("Envs variable must be a json formatted string");
 	});
 
-	test.each(["passphrase", "port", "fingerprint"])("exportIgnoredEnvs should contain %s", name => {
-		expect(ConfigManager.exportIgnoredEnvs).toContain(name);
+	test.each([
+		{name: "connectTimeout", value: "0", message: "Invalid connectTimeout"},
+		{name: "connectTimeout", value: "abc", message: "Invalid argument value"},
+		{name: "timeout", value: "-5", message: "Invalid timeout"},
+	])("constructor should throw exception if $name is $value", ({name, value, message}) => {
+		//given
+		mockInputs({...validInputs, [name]: value});
+
+		//when
+		//then
+		expect(() => new ConfigManager()).toThrow(message);
 	});
+
+	test("constructor should use default timeouts when inputs are empty", () => {
+		//given
+		mockInputs(validInputs);
+
+		//when
+		const manager = new ConfigManager();
+
+		//then
+		expect(manager.config.connectTimeout).toBe(20);
+		expect(manager.config.timeout).toBe(0);
+	});
+
+	test.each(["passphrase", "port", "fingerprint", "connectTimeout", "timeout"])(
+		"exportIgnoredEnvs should contain %s",
+		name => {
+			expect(ConfigManager.exportIgnoredEnvs).toContain(name);
+		}
+	);
 });

@@ -15,6 +15,8 @@ export interface ConfigInterface {
 	command: string[];
 	exportActionOptions: boolean;
 	tty: boolean;
+	connectTimeout: number;
+	timeout: number;
 }
 
 export class ConfigManager {
@@ -31,6 +33,8 @@ export class ConfigManager {
 		"envs",
 		"exportActionOptions",
 		"tty",
+		"connectTimeout",
+		"timeout",
 	];
 
 	private static readonly envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -51,6 +55,8 @@ export class ConfigManager {
 			ignoredEnvs: InputParser.getStringArray("ignoredEnvs"),
 			exportActionOptions: InputParser.getBoolean("exportActionOptions", false),
 			tty: InputParser.getBoolean("tty", false),
+			connectTimeout: InputParser.getNumber("connectTimeout", 20),
+			timeout: InputParser.getNumber("timeout", 0),
 		};
 
 		let rawEnvs: Record<string, unknown>;
@@ -97,6 +103,14 @@ export class ConfigManager {
 
 		if (!this.config.password && !this.config.key) {
 			throw new Error("Missing credentials, please provide at least one way to authenticate");
+		}
+
+		if (!validator.isInt(String(this.config.connectTimeout), {min: 1})) {
+			throw new Error("Invalid connectTimeout, it must be a number of seconds greater than 0");
+		}
+
+		if (!validator.isInt(String(this.config.timeout), {min: 0})) {
+			throw new Error("Invalid timeout, it must be a number of seconds, 0 disables it");
 		}
 
 		if (this.config.command.length === 0) {

@@ -17,6 +17,7 @@ async function run(): Promise<void> {
 			port: config.port,
 			username: config.user,
 			keepaliveInterval: 15000,
+			readyTimeout: config.connectTimeout * 1000,
 		};
 
 		if (config.key) {
@@ -43,7 +44,7 @@ async function run(): Promise<void> {
 			);
 		}
 
-		// initlaize ssh
+		// initialize ssh
 		try {
 			await ssh.connect(sshConfig);
 		} catch (error) {
@@ -53,7 +54,7 @@ async function run(): Promise<void> {
 			throw error;
 		}
 
-		core.info("Connection estabilished...");
+		core.info("Connection established...");
 
 		// ignore action inputs when needed
 		const ignoredEnvKeys = new Set(ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
@@ -100,7 +101,20 @@ async function run(): Promise<void> {
 		core.info(`Executing commands...`);
 		core.info("########## START ###########");
 
-		const response = await ssh.execCommand(command, execCommandOptions);
+		let timer: NodeJS.Timeout | undefined;
+		const execution = ssh.execCommand(command, execCommandOptions);
+		const response = await (config.timeout === 0
+			? execution
+			: Promise.race([
+					execution,
+					new Promise<never>((_, reject) => {
+						timer = setTimeout(() => {
+							// closing the connection is the only way to stop waiting for the remote command
+							ssh.dispose();
+							reject(new Error(`Command timed out after ${config.timeout} seconds`));
+						}, config.timeout * 1000);
+					}),
+			  ]).finally(() => clearTimeout(timer)));
 
 		if (!sawStdout && response.stdout) {
 			core.info(response.stdout);

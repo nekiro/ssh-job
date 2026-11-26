@@ -48,11 +48,11 @@ export class InputParser {
 		return validator.toBoolean(value, true);
 	};
 
-	public static getNumber = (name: string): number => {
+	public static getNumber = (name: string, defaultValue = Number.NaN): number => {
 		const value = core.getInput(name);
 
 		if (value.length === 0) {
-			return Number.NaN;
+			return defaultValue;
 		}
 
 		if (!validator.isInt(value)) {
