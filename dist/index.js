@@ -22,33 +22,49 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ConfigManager = void 0;
 const core = __importStar(__nccwpck_require__(2186));
+const validator_1 = __importDefault(__nccwpck_require__(7527));
 const InputParser_1 = __nccwpck_require__(366);
 class ConfigManager {
+    static exportIgnoredEnvs = [
+        "host",
+        "port",
+        "key",
+        "passphrase",
+        "user",
+        "password",
+        "fingerprint",
+        "command",
+        "ignoredEnvs",
+        "envs",
+        "exportActionOptions",
+        "tty",
+    ];
+    static envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    config;
     constructor(validate = true) {
-        this.validate = () => {
-            if (!this.config.host) {
-                throw new Error("Missing host");
-            }
-            if (!this.config.user) {
-                throw new Error("Missing user");
-            }
-            if (!this.config.password && !this.config.key) {
-                throw new Error("Missing credentials, please provide at least one way to authenticate");
-            }
-            if (this.config.command.length === 0) {
-                throw new Error("Provide command to execute when connected");
-            }
-        };
         const config = {
             host: InputParser_1.InputParser.getString("host"),
             port: InputParser_1.InputParser.getNumber("port"),
@@ -56,44 +72,56 @@ class ConfigManager {
             passphrase: InputParser_1.InputParser.getString("passphrase"),
             user: InputParser_1.InputParser.getString("user"),
             password: InputParser_1.InputParser.getString("password"),
+            fingerprint: InputParser_1.InputParser.getString("fingerprint"),
             envs: [],
             command: InputParser_1.InputParser.getMultilineString("command"),
             ignoredEnvs: InputParser_1.InputParser.getStringArray("ignoredEnvs"),
             exportActionOptions: InputParser_1.InputParser.getBoolean("exportActionOptions", false),
             tty: InputParser_1.InputParser.getBoolean("tty", false),
         };
+        let rawEnvs;
         try {
-            const rawEnvs = Object.entries(InputParser_1.InputParser.getJsonFormatted("envs"));
-            rawEnvs.forEach(env => {
-                const [key, value] = env;
-                if (!config.ignoredEnvs.includes(key)) {
-                    core.debug(`Registering ${key} ${value} ...`);
-                    core.exportVariable(key, value);
-                    config.envs.push({ key, value });
-                }
-            });
+            rawEnvs = InputParser_1.InputParser.getJsonFormatted("envs");
         }
-        catch (err) {
+        catch {
             throw new Error("Envs variable must be a json formatted string, make sure you pass correct values");
+        }
+        for (const [key, rawValue] of Object.entries(rawEnvs)) {
+            if (config.ignoredEnvs.includes(key)) {
+                continue;
+            }
+            // the key is written into the remote shell script, so it must be a plain variable name
+            if (!ConfigManager.envKeyPattern.test(key)) {
+                throw new Error(`Invalid env name "${key}", only letters, digits and underscores are allowed`);
+            }
+            const value = typeof rawValue === "string" ? rawValue : JSON.stringify(rawValue);
+            core.debug(`Registering ${key} ...`);
+            config.envs.push({ key, value });
         }
         this.config = config;
         if (validate) {
             this.validate();
         }
     }
+    validate = () => {
+        if (!this.config.host) {
+            throw new Error("Missing host");
+        }
+        if (!validator_1.default.isInt(String(this.config.port), { min: 1, max: 65535 })) {
+            throw new Error("Invalid port, it must be a number between 1 and 65535");
+        }
+        if (!this.config.user) {
+            throw new Error("Missing user");
+        }
+        if (!this.config.password && !this.config.key) {
+            throw new Error("Missing credentials, please provide at least one way to authenticate");
+        }
+        if (this.config.command.length === 0) {
+            throw new Error("Provide command to execute when connected");
+        }
+    };
 }
 exports.ConfigManager = ConfigManager;
-ConfigManager.exportIgnoredEnvs = [
-    "host",
-    "key",
-    "user",
-    "password",
-    "command",
-    "ignoredEnvs",
-    "envs",
-    "exportActionOptions",
-    "tty",
-];
 
 
 /***/ }),
@@ -119,13 +147,23 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -134,47 +172,52 @@ exports.InputParser = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const validator_1 = __importDefault(__nccwpck_require__(7527));
 class InputParser {
+    static getMultilineString = (name) => {
+        return core.getMultilineInput(name);
+    };
+    static getString = (name) => {
+        return core.getInput(name);
+    };
+    static getJsonFormatted = (name) => {
+        const value = core.getInput(name);
+        if (value.length === 0) {
+            return {};
+        }
+        const parsed = JSON.parse(value);
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw Error(`Invalid argument value for ${name}, pass a json object`);
+        }
+        return parsed;
+    };
+    static getStringArray = (name) => {
+        return core
+            .getInput(name)
+            .split(",")
+            .map(entry => entry.trim())
+            .filter(entry => entry.length !== 0);
+    };
+    static getBoolean = (name, defaultValue = false) => {
+        const value = core.getInput(name);
+        if (value.length === 0) {
+            return defaultValue;
+        }
+        if (!validator_1.default.isBoolean(value, { loose: false })) {
+            throw Error(`Invalid argument value for ${name}`);
+        }
+        return validator_1.default.toBoolean(value, true);
+    };
+    static getNumber = (name) => {
+        const value = core.getInput(name);
+        if (value.length === 0) {
+            return Number.NaN;
+        }
+        if (!validator_1.default.isInt(value)) {
+            throw Error(`Invalid argument value for ${name}`);
+        }
+        return validator_1.default.toInt(value);
+    };
 }
 exports.InputParser = InputParser;
-InputParser.getMultilineString = (name) => {
-    return core.getMultilineInput(name);
-};
-InputParser.getString = (name) => {
-    return core.getInput(name);
-};
-InputParser.getJsonFormatted = (name) => {
-    const value = core.getInput(name);
-    let parsed = {};
-    if (value.length !== 0) {
-        parsed = JSON.parse(value);
-    }
-    return parsed;
-};
-InputParser.getStringArray = (name) => {
-    const value = core.getInput(name).replace(/\s/g, "");
-    const envs = value.split(",");
-    if (value.length !== 0 && envs.length === 0) {
-        throw Error(`Invalid argument value for ${name}, pass comma separated string ex. something,something`);
-    }
-    return envs;
-};
-InputParser.getBoolean = (name, defaultValue) => {
-    let value = core.getInput(name);
-    if (value.length !== 0 && !validator_1.default.isBoolean(value, { loose: false })) {
-        throw Error(`Invalid argument value for ${name}`);
-    }
-    else if (value.length === 0 && defaultValue) {
-        value = String(defaultValue);
-    }
-    return validator_1.default.toBoolean(value, true);
-};
-InputParser.getNumber = (name) => {
-    const value = core.getInput(name);
-    if (value.length !== 0 && !validator_1.default.isInt(value)) {
-        throw Error(`Invalid argument value for ${name}`);
-    }
-    return validator_1.default.toInt(value);
-};
 
 
 /***/ }),
@@ -200,98 +243,167 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
 const ConfigManager_1 = __nccwpck_require__(1298);
 const node_ssh_1 = __nccwpck_require__(7334);
-function run() {
-    var _a;
-    return __awaiter(this, void 0, void 0, function* () {
-        const ssh = new node_ssh_1.NodeSSH();
-        try {
-            const configManager = new ConfigManager_1.ConfigManager();
-            const sshConfig = {
-                host: configManager.config.host,
-                port: configManager.config.port,
-                username: configManager.config.user,
-            };
-            if (configManager.config.key) {
-                sshConfig.privateKey = configManager.config.key;
-                if (configManager.config.passphrase) {
-                    sshConfig.passphrase = configManager.config.passphrase;
+const utils_1 = __nccwpck_require__(918);
+const SHELL = "bash --noprofile --norc";
+async function run() {
+    const ssh = new node_ssh_1.NodeSSH();
+    try {
+        const configManager = new ConfigManager_1.ConfigManager();
+        const { config } = configManager;
+        const sshConfig = {
+            host: config.host,
+            port: config.port,
+            username: config.user,
+            keepaliveInterval: 15000,
+        };
+        if (config.key) {
+            sshConfig.privateKey = config.key;
+            if (config.passphrase) {
+                sshConfig.passphrase = config.passphrase;
+            }
+        }
+        else {
+            sshConfig.password = config.password;
+        }
+        let rejectedFingerprint = "";
+        if (config.fingerprint) {
+            sshConfig.hostVerifier = (hostKey) => {
+                if ((0, utils_1.matchesFingerprint)(hostKey, config.fingerprint)) {
+                    return true;
                 }
-            }
-            else {
-                sshConfig.password = configManager.config.password;
-            }
-            // initlaize ssh
-            yield ssh.connect(sshConfig);
-            core.info("Connection estabilished...");
-            // ignore action inputs when needed
-            const ignoredEnvKeys = new Set(ConfigManager_1.ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
-            const envs = configManager.config.exportActionOptions
-                ? configManager.config.envs
-                : configManager.config.envs.filter(({ key }) => !ignoredEnvKeys.has(key.toLowerCase()));
-            const shellQuote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
-            const exportLines = envs.map(({ key, value }) => `export ${key}=${shellQuote(value)}`);
-            const scriptLines = ["set -euo pipefail", ...exportLines, ...configManager.config.command];
-            const script = `${scriptLines.join("\n")}\n`;
-            core.info(`Executing commands...`);
-            core.info("########## START ###########");
-            let sawStdout = false;
-            let sawStderr = false;
-            const execCommandOptions = {
-                onStdout: chunk => {
-                    sawStdout = true;
-                    process.stdout.write(chunk.toString("utf8"));
-                },
-                onStderr: chunk => {
-                    sawStderr = true;
-                    process.stderr.write(chunk.toString("utf8"));
-                },
+                rejectedFingerprint = (0, utils_1.getFingerprint)(hostKey);
+                return false;
             };
-            if (configManager.config.tty) {
-                execCommandOptions.execOptions = { pty: true };
-            }
-            const response = yield ssh.execCommand("bash --noprofile --norc -c 'source /dev/stdin'", Object.assign(Object.assign({}, execCommandOptions), { stdin: script }));
-            if (!sawStdout && response.stdout) {
-                core.info(response.stdout);
-            }
-            if (!sawStderr && response.stderr) {
-                core.error(response.stderr);
-            }
-            if (response.code != 0) {
-                const stderr = (_a = response.stderr) === null || _a === void 0 ? void 0 : _a.trim();
-                throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");
-            }
-            core.info("########### END ##########");
-            core.info("Executed all commands successfully! 🚀");
+        }
+        else {
+            core.warning("Host key is not verified, set the fingerprint input to protect the connection from man-in-the-middle attacks");
+        }
+        // initlaize ssh
+        try {
+            await ssh.connect(sshConfig);
         }
         catch (error) {
-            core.setFailed(error instanceof Error ? error.message : String(error));
+            if (rejectedFingerprint) {
+                throw new Error(`Host key verification failed, server presented ${rejectedFingerprint}`);
+            }
+            throw error;
         }
-        finally {
-            ssh.dispose();
+        core.info("Connection estabilished...");
+        // ignore action inputs when needed
+        const ignoredEnvKeys = new Set(ConfigManager_1.ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
+        const envs = config.exportActionOptions
+            ? config.envs
+            : config.envs.filter(({ key }) => !ignoredEnvKeys.has(key.toLowerCase()));
+        const script = (0, utils_1.buildScript)(envs, config.command);
+        let sawStdout = false;
+        let sawStderr = false;
+        const execCommandOptions = {
+            onStdout: chunk => {
+                sawStdout = true;
+                process.stdout.write(chunk.toString("utf8"));
+            },
+            onStderr: chunk => {
+                sawStderr = true;
+                process.stderr.write(chunk.toString("utf8"));
+            },
+        };
+        let command = `${SHELL} -c 'source /dev/stdin'`;
+        if (config.tty) {
+            // A pseudo-terminal echoes its input, which would print the script (and the exported envs) to the log,
+            // so the script is uploaded to a private temporary file first and removed before it starts running.
+            const upload = await ssh.execCommand(`umask 077 && f=$(mktemp) && cat > "$f" && printf %s "$f"`, {
+                stdin: script,
+            });
+            const scriptPath = upload.stdout.trim();
+            if (upload.code !== 0 || !scriptPath) {
+                const stderr = upload.stderr?.trim();
+                throw new Error(stderr ? `Failed to upload script: ${stderr}` : "Failed to upload script");
+            }
+            command = `${SHELL} -c 'exec 9<"$1"; rm -f -- "$1"; shift; source /dev/fd/9' bash ${(0, utils_1.shellQuote)(scriptPath)}`;
+            execCommandOptions.execOptions = { pty: true };
         }
-    });
+        else {
+            execCommandOptions.stdin = script;
+        }
+        core.info(`Executing commands...`);
+        core.info("########## START ###########");
+        const response = await ssh.execCommand(command, execCommandOptions);
+        if (!sawStdout && response.stdout) {
+            core.info(response.stdout);
+        }
+        if (!sawStderr && response.stderr) {
+            core.error(response.stderr);
+        }
+        if (response.code !== 0) {
+            const stderr = response.stderr?.trim();
+            throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");
+        }
+        core.info("########### END ##########");
+        core.info("Executed all commands successfully! 🚀");
+    }
+    catch (error) {
+        core.setFailed(error instanceof Error ? error.message : String(error));
+    }
+    finally {
+        ssh.dispose();
+    }
 }
 run();
+
+
+/***/ }),
+
+/***/ 918:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.matchesFingerprint = exports.getFingerprint = exports.buildScript = exports.shellQuote = void 0;
+const crypto_1 = __nccwpck_require__(6113);
+const shellQuote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
+exports.shellQuote = shellQuote;
+const buildScript = (envs, command) => {
+    const exportLines = envs.map(({ key, value }) => `export ${key}=${(0, exports.shellQuote)(value)}`);
+    return `${["set -euo pipefail", ...exportLines, ...command].join("\n")}\n`;
+};
+exports.buildScript = buildScript;
+/** Returns the host key fingerprint in the format printed by `ssh-keygen -lf`, ex. SHA256:abc... */
+const getFingerprint = (hostKey) => {
+    return `SHA256:${(0, crypto_1.createHash)("sha256").update(hostKey).digest("base64").replace(/=+$/, "")}`;
+};
+exports.getFingerprint = getFingerprint;
+const normalizeFingerprint = (fingerprint) => {
+    return fingerprint
+        .trim()
+        .replace(/^SHA256:/i, "")
+        .replace(/=+$/, "");
+};
+const matchesFingerprint = (hostKey, expected) => {
+    return normalizeFingerprint((0, exports.getFingerprint)(hostKey)) === normalizeFingerprint(expected);
+};
+exports.matchesFingerprint = matchesFingerprint;
 
 
 /***/ }),
@@ -303,7 +415,11 @@ run();
 
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -316,7 +432,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -378,13 +494,13 @@ class Command {
     }
 }
 function escapeData(s) {
-    return utils_1.toCommandValue(s)
+    return (0, utils_1.toCommandValue)(s)
         .replace(/%/g, '%25')
         .replace(/\r/g, '%0D')
         .replace(/\n/g, '%0A');
 }
 function escapeProperty(s) {
-    return utils_1.toCommandValue(s)
+    return (0, utils_1.toCommandValue)(s)
         .replace(/%/g, '%25')
         .replace(/\r/g, '%0D')
         .replace(/\n/g, '%0A')
@@ -402,7 +518,11 @@ function escapeProperty(s) {
 
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -415,7 +535,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -429,7 +549,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+exports.platform = exports.toPlatformPath = exports.toWin32Path = exports.toPosixPath = exports.markdownSummary = exports.summary = exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __nccwpck_require__(7351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
@@ -449,7 +569,7 @@ var ExitCode;
      * A code indicating that the action was a failure
      */
     ExitCode[ExitCode["Failure"] = 1] = "Failure";
-})(ExitCode = exports.ExitCode || (exports.ExitCode = {}));
+})(ExitCode || (exports.ExitCode = ExitCode = {}));
 //-----------------------------------------------------------------------
 // Variables
 //-----------------------------------------------------------------------
@@ -460,13 +580,13 @@ var ExitCode;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function exportVariable(name, val) {
-    const convertedVal = utils_1.toCommandValue(val);
+    const convertedVal = (0, utils_1.toCommandValue)(val);
     process.env[name] = convertedVal;
     const filePath = process.env['GITHUB_ENV'] || '';
     if (filePath) {
-        return file_command_1.issueFileCommand('ENV', file_command_1.prepareKeyValueMessage(name, val));
+        return (0, file_command_1.issueFileCommand)('ENV', (0, file_command_1.prepareKeyValueMessage)(name, val));
     }
-    command_1.issueCommand('set-env', { name }, convertedVal);
+    (0, command_1.issueCommand)('set-env', { name }, convertedVal);
 }
 exports.exportVariable = exportVariable;
 /**
@@ -474,7 +594,7 @@ exports.exportVariable = exportVariable;
  * @param secret value of the secret
  */
 function setSecret(secret) {
-    command_1.issueCommand('add-mask', {}, secret);
+    (0, command_1.issueCommand)('add-mask', {}, secret);
 }
 exports.setSecret = setSecret;
 /**
@@ -484,10 +604,10 @@ exports.setSecret = setSecret;
 function addPath(inputPath) {
     const filePath = process.env['GITHUB_PATH'] || '';
     if (filePath) {
-        file_command_1.issueFileCommand('PATH', inputPath);
+        (0, file_command_1.issueFileCommand)('PATH', inputPath);
     }
     else {
-        command_1.issueCommand('add-path', {}, inputPath);
+        (0, command_1.issueCommand)('add-path', {}, inputPath);
     }
     process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
 }
@@ -562,10 +682,10 @@ exports.getBooleanInput = getBooleanInput;
 function setOutput(name, value) {
     const filePath = process.env['GITHUB_OUTPUT'] || '';
     if (filePath) {
-        return file_command_1.issueFileCommand('OUTPUT', file_command_1.prepareKeyValueMessage(name, value));
+        return (0, file_command_1.issueFileCommand)('OUTPUT', (0, file_command_1.prepareKeyValueMessage)(name, value));
     }
     process.stdout.write(os.EOL);
-    command_1.issueCommand('set-output', { name }, utils_1.toCommandValue(value));
+    (0, command_1.issueCommand)('set-output', { name }, (0, utils_1.toCommandValue)(value));
 }
 exports.setOutput = setOutput;
 /**
@@ -574,7 +694,7 @@ exports.setOutput = setOutput;
  *
  */
 function setCommandEcho(enabled) {
-    command_1.issue('echo', enabled ? 'on' : 'off');
+    (0, command_1.issue)('echo', enabled ? 'on' : 'off');
 }
 exports.setCommandEcho = setCommandEcho;
 //-----------------------------------------------------------------------
@@ -605,7 +725,7 @@ exports.isDebug = isDebug;
  * @param message debug message
  */
 function debug(message) {
-    command_1.issueCommand('debug', {}, message);
+    (0, command_1.issueCommand)('debug', {}, message);
 }
 exports.debug = debug;
 /**
@@ -614,7 +734,7 @@ exports.debug = debug;
  * @param properties optional properties to add to the annotation.
  */
 function error(message, properties = {}) {
-    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    (0, command_1.issueCommand)('error', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 }
 exports.error = error;
 /**
@@ -623,7 +743,7 @@ exports.error = error;
  * @param properties optional properties to add to the annotation.
  */
 function warning(message, properties = {}) {
-    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    (0, command_1.issueCommand)('warning', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 }
 exports.warning = warning;
 /**
@@ -632,7 +752,7 @@ exports.warning = warning;
  * @param properties optional properties to add to the annotation.
  */
 function notice(message, properties = {}) {
-    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    (0, command_1.issueCommand)('notice', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 }
 exports.notice = notice;
 /**
@@ -651,14 +771,14 @@ exports.info = info;
  * @param name The name of the output group
  */
 function startGroup(name) {
-    command_1.issue('group', name);
+    (0, command_1.issue)('group', name);
 }
 exports.startGroup = startGroup;
 /**
  * End an output group.
  */
 function endGroup() {
-    command_1.issue('endgroup');
+    (0, command_1.issue)('endgroup');
 }
 exports.endGroup = endGroup;
 /**
@@ -696,9 +816,9 @@ exports.group = group;
 function saveState(name, value) {
     const filePath = process.env['GITHUB_STATE'] || '';
     if (filePath) {
-        return file_command_1.issueFileCommand('STATE', file_command_1.prepareKeyValueMessage(name, value));
+        return (0, file_command_1.issueFileCommand)('STATE', (0, file_command_1.prepareKeyValueMessage)(name, value));
     }
-    command_1.issueCommand('save-state', { name }, utils_1.toCommandValue(value));
+    (0, command_1.issueCommand)('save-state', { name }, (0, utils_1.toCommandValue)(value));
 }
 exports.saveState = saveState;
 /**
@@ -734,6 +854,10 @@ var path_utils_1 = __nccwpck_require__(2981);
 Object.defineProperty(exports, "toPosixPath", ({ enumerable: true, get: function () { return path_utils_1.toPosixPath; } }));
 Object.defineProperty(exports, "toWin32Path", ({ enumerable: true, get: function () { return path_utils_1.toWin32Path; } }));
 Object.defineProperty(exports, "toPlatformPath", ({ enumerable: true, get: function () { return path_utils_1.toPlatformPath; } }));
+/**
+ * Platform utilities exports
+ */
+exports.platform = __importStar(__nccwpck_require__(5243));
 //# sourceMappingURL=core.js.map
 
 /***/ }),
@@ -746,7 +870,11 @@ Object.defineProperty(exports, "toPlatformPath", ({ enumerable: true, get: funct
 // For internal use, subject to change.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -759,7 +887,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -767,9 +895,9 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.prepareKeyValueMessage = exports.issueFileCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const crypto = __importStar(__nccwpck_require__(6113));
 const fs = __importStar(__nccwpck_require__(7147));
 const os = __importStar(__nccwpck_require__(2037));
-const uuid_1 = __nccwpck_require__(5840);
 const utils_1 = __nccwpck_require__(5278);
 function issueFileCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
@@ -779,14 +907,14 @@ function issueFileCommand(command, message) {
     if (!fs.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
     }
-    fs.appendFileSync(filePath, `${utils_1.toCommandValue(message)}${os.EOL}`, {
+    fs.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os.EOL}`, {
         encoding: 'utf8'
     });
 }
 exports.issueFileCommand = issueFileCommand;
 function prepareKeyValueMessage(key, value) {
-    const delimiter = `ghadelimiter_${uuid_1.v4()}`;
-    const convertedValue = utils_1.toCommandValue(value);
+    const delimiter = `ghadelimiter_${crypto.randomUUID()}`;
+    const convertedValue = (0, utils_1.toCommandValue)(value);
     // These should realistically never happen, but just in case someone finds a
     // way to exploit uuid generation let's not allow keys or values that contain
     // the delimiter.
@@ -853,7 +981,7 @@ class OidcClient {
                 .catch(error => {
                 throw new Error(`Failed to get ID Token. \n 
         Error Code : ${error.statusCode}\n 
-        Error Message: ${error.result.message}`);
+        Error Message: ${error.message}`);
             });
             const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
             if (!id_token) {
@@ -871,9 +999,9 @@ class OidcClient {
                     const encodedAudience = encodeURIComponent(audience);
                     id_token_url = `${id_token_url}&audience=${encodedAudience}`;
                 }
-                core_1.debug(`ID token url is ${id_token_url}`);
+                (0, core_1.debug)(`ID token url is ${id_token_url}`);
                 const id_token = yield OidcClient.getCall(id_token_url);
-                core_1.setSecret(id_token);
+                (0, core_1.setSecret)(id_token);
                 return id_token;
             }
             catch (error) {
@@ -894,7 +1022,11 @@ exports.OidcClient = OidcClient;
 
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -907,7 +1039,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -949,6 +1081,107 @@ function toPlatformPath(pth) {
 }
 exports.toPlatformPath = toPlatformPath;
 //# sourceMappingURL=path-utils.js.map
+
+/***/ }),
+
+/***/ 5243:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getDetails = exports.isLinux = exports.isMacOS = exports.isWindows = exports.arch = exports.platform = void 0;
+const os_1 = __importDefault(__nccwpck_require__(2037));
+const exec = __importStar(__nccwpck_require__(1514));
+const getWindowsInfo = () => __awaiter(void 0, void 0, void 0, function* () {
+    const { stdout: version } = yield exec.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', undefined, {
+        silent: true
+    });
+    const { stdout: name } = yield exec.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', undefined, {
+        silent: true
+    });
+    return {
+        name: name.trim(),
+        version: version.trim()
+    };
+});
+const getMacOsInfo = () => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    const { stdout } = yield exec.getExecOutput('sw_vers', undefined, {
+        silent: true
+    });
+    const version = (_b = (_a = stdout.match(/ProductVersion:\s*(.+)/)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : '';
+    const name = (_d = (_c = stdout.match(/ProductName:\s*(.+)/)) === null || _c === void 0 ? void 0 : _c[1]) !== null && _d !== void 0 ? _d : '';
+    return {
+        name,
+        version
+    };
+});
+const getLinuxInfo = () => __awaiter(void 0, void 0, void 0, function* () {
+    const { stdout } = yield exec.getExecOutput('lsb_release', ['-i', '-r', '-s'], {
+        silent: true
+    });
+    const [name, version] = stdout.trim().split('\n');
+    return {
+        name,
+        version
+    };
+});
+exports.platform = os_1.default.platform();
+exports.arch = os_1.default.arch();
+exports.isWindows = exports.platform === 'win32';
+exports.isMacOS = exports.platform === 'darwin';
+exports.isLinux = exports.platform === 'linux';
+function getDetails() {
+    return __awaiter(this, void 0, void 0, function* () {
+        return Object.assign(Object.assign({}, (yield (exports.isWindows
+            ? getWindowsInfo()
+            : exports.isMacOS
+                ? getMacOsInfo()
+                : getLinuxInfo()))), { platform: exports.platform,
+            arch: exports.arch,
+            isWindows: exports.isWindows,
+            isMacOS: exports.isMacOS,
+            isLinux: exports.isLinux });
+    });
+}
+exports.getDetails = getDetails;
+//# sourceMappingURL=platform.js.map
 
 /***/ }),
 
@@ -1286,6 +1519,741 @@ function toCommandProperties(annotationProperties) {
 }
 exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
+
+/***/ }),
+
+/***/ 1514:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getExecOutput = exports.exec = void 0;
+const string_decoder_1 = __nccwpck_require__(1576);
+const tr = __importStar(__nccwpck_require__(8159));
+/**
+ * Exec a command.
+ * Output will be streamed to the live console.
+ * Returns promise with return code
+ *
+ * @param     commandLine        command to execute (can include additional args). Must be correctly escaped.
+ * @param     args               optional arguments for tool. Escaping is handled by the lib.
+ * @param     options            optional exec options.  See ExecOptions
+ * @returns   Promise<number>    exit code
+ */
+function exec(commandLine, args, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const commandArgs = tr.argStringToArray(commandLine);
+        if (commandArgs.length === 0) {
+            throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
+        }
+        // Path to tool to execute should be first arg
+        const toolPath = commandArgs[0];
+        args = commandArgs.slice(1).concat(args || []);
+        const runner = new tr.ToolRunner(toolPath, args, options);
+        return runner.exec();
+    });
+}
+exports.exec = exec;
+/**
+ * Exec a command and get the output.
+ * Output will be streamed to the live console.
+ * Returns promise with the exit code and collected stdout and stderr
+ *
+ * @param     commandLine           command to execute (can include additional args). Must be correctly escaped.
+ * @param     args                  optional arguments for tool. Escaping is handled by the lib.
+ * @param     options               optional exec options.  See ExecOptions
+ * @returns   Promise<ExecOutput>   exit code, stdout, and stderr
+ */
+function getExecOutput(commandLine, args, options) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        let stdout = '';
+        let stderr = '';
+        //Using string decoder covers the case where a mult-byte character is split
+        const stdoutDecoder = new string_decoder_1.StringDecoder('utf8');
+        const stderrDecoder = new string_decoder_1.StringDecoder('utf8');
+        const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
+        const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
+        const stdErrListener = (data) => {
+            stderr += stderrDecoder.write(data);
+            if (originalStdErrListener) {
+                originalStdErrListener(data);
+            }
+        };
+        const stdOutListener = (data) => {
+            stdout += stdoutDecoder.write(data);
+            if (originalStdoutListener) {
+                originalStdoutListener(data);
+            }
+        };
+        const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
+        const exitCode = yield exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
+        //flush any remaining characters
+        stdout += stdoutDecoder.end();
+        stderr += stderrDecoder.end();
+        return {
+            exitCode,
+            stdout,
+            stderr
+        };
+    });
+}
+exports.getExecOutput = getExecOutput;
+//# sourceMappingURL=exec.js.map
+
+/***/ }),
+
+/***/ 8159:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.argStringToArray = exports.ToolRunner = void 0;
+const os = __importStar(__nccwpck_require__(2037));
+const events = __importStar(__nccwpck_require__(2361));
+const child = __importStar(__nccwpck_require__(2081));
+const path = __importStar(__nccwpck_require__(1017));
+const io = __importStar(__nccwpck_require__(7436));
+const ioUtil = __importStar(__nccwpck_require__(1962));
+const timers_1 = __nccwpck_require__(9512);
+/* eslint-disable @typescript-eslint/unbound-method */
+const IS_WINDOWS = process.platform === 'win32';
+/*
+ * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
+ */
+class ToolRunner extends events.EventEmitter {
+    constructor(toolPath, args, options) {
+        super();
+        if (!toolPath) {
+            throw new Error("Parameter 'toolPath' cannot be null or empty.");
+        }
+        this.toolPath = toolPath;
+        this.args = args || [];
+        this.options = options || {};
+    }
+    _debug(message) {
+        if (this.options.listeners && this.options.listeners.debug) {
+            this.options.listeners.debug(message);
+        }
+    }
+    _getCommandString(options, noPrefix) {
+        const toolPath = this._getSpawnFileName();
+        const args = this._getSpawnArgs(options);
+        let cmd = noPrefix ? '' : '[command]'; // omit prefix when piped to a second tool
+        if (IS_WINDOWS) {
+            // Windows + cmd file
+            if (this._isCmdFile()) {
+                cmd += toolPath;
+                for (const a of args) {
+                    cmd += ` ${a}`;
+                }
+            }
+            // Windows + verbatim
+            else if (options.windowsVerbatimArguments) {
+                cmd += `"${toolPath}"`;
+                for (const a of args) {
+                    cmd += ` ${a}`;
+                }
+            }
+            // Windows (regular)
+            else {
+                cmd += this._windowsQuoteCmdArg(toolPath);
+                for (const a of args) {
+                    cmd += ` ${this._windowsQuoteCmdArg(a)}`;
+                }
+            }
+        }
+        else {
+            // OSX/Linux - this can likely be improved with some form of quoting.
+            // creating processes on Unix is fundamentally different than Windows.
+            // on Unix, execvp() takes an arg array.
+            cmd += toolPath;
+            for (const a of args) {
+                cmd += ` ${a}`;
+            }
+        }
+        return cmd;
+    }
+    _processLineBuffer(data, strBuffer, onLine) {
+        try {
+            let s = strBuffer + data.toString();
+            let n = s.indexOf(os.EOL);
+            while (n > -1) {
+                const line = s.substring(0, n);
+                onLine(line);
+                // the rest of the string ...
+                s = s.substring(n + os.EOL.length);
+                n = s.indexOf(os.EOL);
+            }
+            return s;
+        }
+        catch (err) {
+            // streaming lines to console is best effort.  Don't fail a build.
+            this._debug(`error processing line. Failed with error ${err}`);
+            return '';
+        }
+    }
+    _getSpawnFileName() {
+        if (IS_WINDOWS) {
+            if (this._isCmdFile()) {
+                return process.env['COMSPEC'] || 'cmd.exe';
+            }
+        }
+        return this.toolPath;
+    }
+    _getSpawnArgs(options) {
+        if (IS_WINDOWS) {
+            if (this._isCmdFile()) {
+                let argline = `/D /S /C "${this._windowsQuoteCmdArg(this.toolPath)}`;
+                for (const a of this.args) {
+                    argline += ' ';
+                    argline += options.windowsVerbatimArguments
+                        ? a
+                        : this._windowsQuoteCmdArg(a);
+                }
+                argline += '"';
+                return [argline];
+            }
+        }
+        return this.args;
+    }
+    _endsWith(str, end) {
+        return str.endsWith(end);
+    }
+    _isCmdFile() {
+        const upperToolPath = this.toolPath.toUpperCase();
+        return (this._endsWith(upperToolPath, '.CMD') ||
+            this._endsWith(upperToolPath, '.BAT'));
+    }
+    _windowsQuoteCmdArg(arg) {
+        // for .exe, apply the normal quoting rules that libuv applies
+        if (!this._isCmdFile()) {
+            return this._uvQuoteCmdArg(arg);
+        }
+        // otherwise apply quoting rules specific to the cmd.exe command line parser.
+        // the libuv rules are generic and are not designed specifically for cmd.exe
+        // command line parser.
+        //
+        // for a detailed description of the cmd.exe command line parser, refer to
+        // http://stackoverflow.com/questions/4094699/how-does-the-windows-command-interpreter-cmd-exe-parse-scripts/7970912#7970912
+        // need quotes for empty arg
+        if (!arg) {
+            return '""';
+        }
+        // determine whether the arg needs to be quoted
+        const cmdSpecialChars = [
+            ' ',
+            '\t',
+            '&',
+            '(',
+            ')',
+            '[',
+            ']',
+            '{',
+            '}',
+            '^',
+            '=',
+            ';',
+            '!',
+            "'",
+            '+',
+            ',',
+            '`',
+            '~',
+            '|',
+            '<',
+            '>',
+            '"'
+        ];
+        let needsQuotes = false;
+        for (const char of arg) {
+            if (cmdSpecialChars.some(x => x === char)) {
+                needsQuotes = true;
+                break;
+            }
+        }
+        // short-circuit if quotes not needed
+        if (!needsQuotes) {
+            return arg;
+        }
+        // the following quoting rules are very similar to the rules that by libuv applies.
+        //
+        // 1) wrap the string in quotes
+        //
+        // 2) double-up quotes - i.e. " => ""
+        //
+        //    this is different from the libuv quoting rules. libuv replaces " with \", which unfortunately
+        //    doesn't work well with a cmd.exe command line.
+        //
+        //    note, replacing " with "" also works well if the arg is passed to a downstream .NET console app.
+        //    for example, the command line:
+        //          foo.exe "myarg:""my val"""
+        //    is parsed by a .NET console app into an arg array:
+        //          [ "myarg:\"my val\"" ]
+        //    which is the same end result when applying libuv quoting rules. although the actual
+        //    command line from libuv quoting rules would look like:
+        //          foo.exe "myarg:\"my val\""
+        //
+        // 3) double-up slashes that precede a quote,
+        //    e.g.  hello \world    => "hello \world"
+        //          hello\"world    => "hello\\""world"
+        //          hello\\"world   => "hello\\\\""world"
+        //          hello world\    => "hello world\\"
+        //
+        //    technically this is not required for a cmd.exe command line, or the batch argument parser.
+        //    the reasons for including this as a .cmd quoting rule are:
+        //
+        //    a) this is optimized for the scenario where the argument is passed from the .cmd file to an
+        //       external program. many programs (e.g. .NET console apps) rely on the slash-doubling rule.
+        //
+        //    b) it's what we've been doing previously (by deferring to node default behavior) and we
+        //       haven't heard any complaints about that aspect.
+        //
+        // note, a weakness of the quoting rules chosen here, is that % is not escaped. in fact, % cannot be
+        // escaped when used on the command line directly - even though within a .cmd file % can be escaped
+        // by using %%.
+        //
+        // the saving grace is, on the command line, %var% is left as-is if var is not defined. this contrasts
+        // the line parsing rules within a .cmd file, where if var is not defined it is replaced with nothing.
+        //
+        // one option that was explored was replacing % with ^% - i.e. %var% => ^%var^%. this hack would
+        // often work, since it is unlikely that var^ would exist, and the ^ character is removed when the
+        // variable is used. the problem, however, is that ^ is not removed when %* is used to pass the args
+        // to an external program.
+        //
+        // an unexplored potential solution for the % escaping problem, is to create a wrapper .cmd file.
+        // % can be escaped within a .cmd file.
+        let reverse = '"';
+        let quoteHit = true;
+        for (let i = arg.length; i > 0; i--) {
+            // walk the string in reverse
+            reverse += arg[i - 1];
+            if (quoteHit && arg[i - 1] === '\\') {
+                reverse += '\\'; // double the slash
+            }
+            else if (arg[i - 1] === '"') {
+                quoteHit = true;
+                reverse += '"'; // double the quote
+            }
+            else {
+                quoteHit = false;
+            }
+        }
+        reverse += '"';
+        return reverse
+            .split('')
+            .reverse()
+            .join('');
+    }
+    _uvQuoteCmdArg(arg) {
+        // Tool runner wraps child_process.spawn() and needs to apply the same quoting as
+        // Node in certain cases where the undocumented spawn option windowsVerbatimArguments
+        // is used.
+        //
+        // Since this function is a port of quote_cmd_arg from Node 4.x (technically, lib UV,
+        // see https://github.com/nodejs/node/blob/v4.x/deps/uv/src/win/process.c for details),
+        // pasting copyright notice from Node within this function:
+        //
+        //      Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+        //
+        //      Permission is hereby granted, free of charge, to any person obtaining a copy
+        //      of this software and associated documentation files (the "Software"), to
+        //      deal in the Software without restriction, including without limitation the
+        //      rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+        //      sell copies of the Software, and to permit persons to whom the Software is
+        //      furnished to do so, subject to the following conditions:
+        //
+        //      The above copyright notice and this permission notice shall be included in
+        //      all copies or substantial portions of the Software.
+        //
+        //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        //      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        //      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        //      AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        //      LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+        //      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+        //      IN THE SOFTWARE.
+        if (!arg) {
+            // Need double quotation for empty argument
+            return '""';
+        }
+        if (!arg.includes(' ') && !arg.includes('\t') && !arg.includes('"')) {
+            // No quotation needed
+            return arg;
+        }
+        if (!arg.includes('"') && !arg.includes('\\')) {
+            // No embedded double quotes or backslashes, so I can just wrap
+            // quote marks around the whole thing.
+            return `"${arg}"`;
+        }
+        // Expected input/output:
+        //   input : hello"world
+        //   output: "hello\"world"
+        //   input : hello""world
+        //   output: "hello\"\"world"
+        //   input : hello\world
+        //   output: hello\world
+        //   input : hello\\world
+        //   output: hello\\world
+        //   input : hello\"world
+        //   output: "hello\\\"world"
+        //   input : hello\\"world
+        //   output: "hello\\\\\"world"
+        //   input : hello world\
+        //   output: "hello world\\" - note the comment in libuv actually reads "hello world\"
+        //                             but it appears the comment is wrong, it should be "hello world\\"
+        let reverse = '"';
+        let quoteHit = true;
+        for (let i = arg.length; i > 0; i--) {
+            // walk the string in reverse
+            reverse += arg[i - 1];
+            if (quoteHit && arg[i - 1] === '\\') {
+                reverse += '\\';
+            }
+            else if (arg[i - 1] === '"') {
+                quoteHit = true;
+                reverse += '\\';
+            }
+            else {
+                quoteHit = false;
+            }
+        }
+        reverse += '"';
+        return reverse
+            .split('')
+            .reverse()
+            .join('');
+    }
+    _cloneExecOptions(options) {
+        options = options || {};
+        const result = {
+            cwd: options.cwd || process.cwd(),
+            env: options.env || process.env,
+            silent: options.silent || false,
+            windowsVerbatimArguments: options.windowsVerbatimArguments || false,
+            failOnStdErr: options.failOnStdErr || false,
+            ignoreReturnCode: options.ignoreReturnCode || false,
+            delay: options.delay || 10000
+        };
+        result.outStream = options.outStream || process.stdout;
+        result.errStream = options.errStream || process.stderr;
+        return result;
+    }
+    _getSpawnOptions(options, toolPath) {
+        options = options || {};
+        const result = {};
+        result.cwd = options.cwd;
+        result.env = options.env;
+        result['windowsVerbatimArguments'] =
+            options.windowsVerbatimArguments || this._isCmdFile();
+        if (options.windowsVerbatimArguments) {
+            result.argv0 = `"${toolPath}"`;
+        }
+        return result;
+    }
+    /**
+     * Exec a tool.
+     * Output will be streamed to the live console.
+     * Returns promise with return code
+     *
+     * @param     tool     path to tool to exec
+     * @param     options  optional exec options.  See ExecOptions
+     * @returns   number
+     */
+    exec() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // root the tool path if it is unrooted and contains relative pathing
+            if (!ioUtil.isRooted(this.toolPath) &&
+                (this.toolPath.includes('/') ||
+                    (IS_WINDOWS && this.toolPath.includes('\\')))) {
+                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
+                this.toolPath = path.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            }
+            // if the tool is only a file name, then resolve it from the PATH
+            // otherwise verify it exists (add extension on Windows if necessary)
+            this.toolPath = yield io.which(this.toolPath, true);
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                this._debug(`exec tool: ${this.toolPath}`);
+                this._debug('arguments:');
+                for (const arg of this.args) {
+                    this._debug(`   ${arg}`);
+                }
+                const optionsNonNull = this._cloneExecOptions(this.options);
+                if (!optionsNonNull.silent && optionsNonNull.outStream) {
+                    optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os.EOL);
+                }
+                const state = new ExecState(optionsNonNull, this.toolPath);
+                state.on('debug', (message) => {
+                    this._debug(message);
+                });
+                if (this.options.cwd && !(yield ioUtil.exists(this.options.cwd))) {
+                    return reject(new Error(`The cwd: ${this.options.cwd} does not exist!`));
+                }
+                const fileName = this._getSpawnFileName();
+                const cp = child.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
+                let stdbuffer = '';
+                if (cp.stdout) {
+                    cp.stdout.on('data', (data) => {
+                        if (this.options.listeners && this.options.listeners.stdout) {
+                            this.options.listeners.stdout(data);
+                        }
+                        if (!optionsNonNull.silent && optionsNonNull.outStream) {
+                            optionsNonNull.outStream.write(data);
+                        }
+                        stdbuffer = this._processLineBuffer(data, stdbuffer, (line) => {
+                            if (this.options.listeners && this.options.listeners.stdline) {
+                                this.options.listeners.stdline(line);
+                            }
+                        });
+                    });
+                }
+                let errbuffer = '';
+                if (cp.stderr) {
+                    cp.stderr.on('data', (data) => {
+                        state.processStderr = true;
+                        if (this.options.listeners && this.options.listeners.stderr) {
+                            this.options.listeners.stderr(data);
+                        }
+                        if (!optionsNonNull.silent &&
+                            optionsNonNull.errStream &&
+                            optionsNonNull.outStream) {
+                            const s = optionsNonNull.failOnStdErr
+                                ? optionsNonNull.errStream
+                                : optionsNonNull.outStream;
+                            s.write(data);
+                        }
+                        errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
+                            if (this.options.listeners && this.options.listeners.errline) {
+                                this.options.listeners.errline(line);
+                            }
+                        });
+                    });
+                }
+                cp.on('error', (err) => {
+                    state.processError = err.message;
+                    state.processExited = true;
+                    state.processClosed = true;
+                    state.CheckComplete();
+                });
+                cp.on('exit', (code) => {
+                    state.processExitCode = code;
+                    state.processExited = true;
+                    this._debug(`Exit code ${code} received from tool '${this.toolPath}'`);
+                    state.CheckComplete();
+                });
+                cp.on('close', (code) => {
+                    state.processExitCode = code;
+                    state.processExited = true;
+                    state.processClosed = true;
+                    this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
+                    state.CheckComplete();
+                });
+                state.on('done', (error, exitCode) => {
+                    if (stdbuffer.length > 0) {
+                        this.emit('stdline', stdbuffer);
+                    }
+                    if (errbuffer.length > 0) {
+                        this.emit('errline', errbuffer);
+                    }
+                    cp.removeAllListeners();
+                    if (error) {
+                        reject(error);
+                    }
+                    else {
+                        resolve(exitCode);
+                    }
+                });
+                if (this.options.input) {
+                    if (!cp.stdin) {
+                        throw new Error('child process missing stdin');
+                    }
+                    cp.stdin.end(this.options.input);
+                }
+            }));
+        });
+    }
+}
+exports.ToolRunner = ToolRunner;
+/**
+ * Convert an arg string to an array of args. Handles escaping
+ *
+ * @param    argString   string of arguments
+ * @returns  string[]    array of arguments
+ */
+function argStringToArray(argString) {
+    const args = [];
+    let inQuotes = false;
+    let escaped = false;
+    let arg = '';
+    function append(c) {
+        // we only escape double quotes.
+        if (escaped && c !== '"') {
+            arg += '\\';
+        }
+        arg += c;
+        escaped = false;
+    }
+    for (let i = 0; i < argString.length; i++) {
+        const c = argString.charAt(i);
+        if (c === '"') {
+            if (!escaped) {
+                inQuotes = !inQuotes;
+            }
+            else {
+                append(c);
+            }
+            continue;
+        }
+        if (c === '\\' && escaped) {
+            append(c);
+            continue;
+        }
+        if (c === '\\' && inQuotes) {
+            escaped = true;
+            continue;
+        }
+        if (c === ' ' && !inQuotes) {
+            if (arg.length > 0) {
+                args.push(arg);
+                arg = '';
+            }
+            continue;
+        }
+        append(c);
+    }
+    if (arg.length > 0) {
+        args.push(arg.trim());
+    }
+    return args;
+}
+exports.argStringToArray = argStringToArray;
+class ExecState extends events.EventEmitter {
+    constructor(options, toolPath) {
+        super();
+        this.processClosed = false; // tracks whether the process has exited and stdio is closed
+        this.processError = '';
+        this.processExitCode = 0;
+        this.processExited = false; // tracks whether the process has exited
+        this.processStderr = false; // tracks whether stderr was written to
+        this.delay = 10000; // 10 seconds
+        this.done = false;
+        this.timeout = null;
+        if (!toolPath) {
+            throw new Error('toolPath must not be empty');
+        }
+        this.options = options;
+        this.toolPath = toolPath;
+        if (options.delay) {
+            this.delay = options.delay;
+        }
+    }
+    CheckComplete() {
+        if (this.done) {
+            return;
+        }
+        if (this.processClosed) {
+            this._setResult();
+        }
+        else if (this.processExited) {
+            this.timeout = timers_1.setTimeout(ExecState.HandleTimeout, this.delay, this);
+        }
+    }
+    _debug(message) {
+        this.emit('debug', message);
+    }
+    _setResult() {
+        // determine whether there is an error
+        let error;
+        if (this.processExited) {
+            if (this.processError) {
+                error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
+            }
+            else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
+                error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
+            }
+            else if (this.processStderr && this.options.failOnStdErr) {
+                error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
+            }
+        }
+        // clear the timeout
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = null;
+        }
+        this.done = true;
+        this.emit('done', error, this.processExitCode);
+    }
+    static HandleTimeout(state) {
+        if (state.done) {
+            return;
+        }
+        if (!state.processClosed && state.processExited) {
+            const message = `The STDIO streams did not close within ${state.delay /
+                1000} seconds of the exit event from process '${state.toolPath}'. This may indicate a child process inherited the STDIO streams and has not yet exited.`;
+            state._debug(message);
+        }
+        state._setResult();
+    }
+}
+//# sourceMappingURL=toolrunner.js.map
 
 /***/ }),
 
@@ -2069,6 +3037,502 @@ function isLoopbackAddress(host) {
         hostLower.startsWith('[0:0:0:0:0:0:0:1]'));
 }
 //# sourceMappingURL=proxy.js.map
+
+/***/ }),
+
+/***/ 1962:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
+const fs = __importStar(__nccwpck_require__(7147));
+const path = __importStar(__nccwpck_require__(1017));
+_a = fs.promises
+// export const {open} = 'fs'
+, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.open = _a.open, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rm = _a.rm, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
+// export const {open} = 'fs'
+exports.IS_WINDOWS = process.platform === 'win32';
+// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
+exports.UV_FS_O_EXLOCK = 0x10000000;
+exports.READONLY = fs.constants.O_RDONLY;
+function exists(fsPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield exports.stat(fsPath);
+        }
+        catch (err) {
+            if (err.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
+        return true;
+    });
+}
+exports.exists = exists;
+function isDirectory(fsPath, useStat = false) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const stats = useStat ? yield exports.stat(fsPath) : yield exports.lstat(fsPath);
+        return stats.isDirectory();
+    });
+}
+exports.isDirectory = isDirectory;
+/**
+ * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
+ * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
+ */
+function isRooted(p) {
+    p = normalizeSeparators(p);
+    if (!p) {
+        throw new Error('isRooted() parameter "p" cannot be empty');
+    }
+    if (exports.IS_WINDOWS) {
+        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
+        ); // e.g. C: or C:\hello
+    }
+    return p.startsWith('/');
+}
+exports.isRooted = isRooted;
+/**
+ * Best effort attempt to determine whether a file exists and is executable.
+ * @param filePath    file path to check
+ * @param extensions  additional file extensions to try
+ * @return if file exists and is executable, returns the file path. otherwise empty string.
+ */
+function tryGetExecutablePath(filePath, extensions) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let stats = undefined;
+        try {
+            // test file exists
+            stats = yield exports.stat(filePath);
+        }
+        catch (err) {
+            if (err.code !== 'ENOENT') {
+                // eslint-disable-next-line no-console
+                console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+            }
+        }
+        if (stats && stats.isFile()) {
+            if (exports.IS_WINDOWS) {
+                // on Windows, test for valid extension
+                const upperExt = path.extname(filePath).toUpperCase();
+                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
+                    return filePath;
+                }
+            }
+            else {
+                if (isUnixExecutable(stats)) {
+                    return filePath;
+                }
+            }
+        }
+        // try each extension
+        const originalFilePath = filePath;
+        for (const extension of extensions) {
+            filePath = originalFilePath + extension;
+            stats = undefined;
+            try {
+                stats = yield exports.stat(filePath);
+            }
+            catch (err) {
+                if (err.code !== 'ENOENT') {
+                    // eslint-disable-next-line no-console
+                    console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+                }
+            }
+            if (stats && stats.isFile()) {
+                if (exports.IS_WINDOWS) {
+                    // preserve the case of the actual file (since an extension was appended)
+                    try {
+                        const directory = path.dirname(filePath);
+                        const upperName = path.basename(filePath).toUpperCase();
+                        for (const actualName of yield exports.readdir(directory)) {
+                            if (upperName === actualName.toUpperCase()) {
+                                filePath = path.join(directory, actualName);
+                                break;
+                            }
+                        }
+                    }
+                    catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
+                    }
+                    return filePath;
+                }
+                else {
+                    if (isUnixExecutable(stats)) {
+                        return filePath;
+                    }
+                }
+            }
+        }
+        return '';
+    });
+}
+exports.tryGetExecutablePath = tryGetExecutablePath;
+function normalizeSeparators(p) {
+    p = p || '';
+    if (exports.IS_WINDOWS) {
+        // convert slashes on Windows
+        p = p.replace(/\//g, '\\');
+        // remove redundant slashes
+        return p.replace(/\\\\+/g, '\\');
+    }
+    // remove redundant slashes
+    return p.replace(/\/\/+/g, '/');
+}
+// on Mac/Linux, test the execute bit
+//     R   W  X  R  W X R W X
+//   256 128 64 32 16 8 4 2 1
+function isUnixExecutable(stats) {
+    return ((stats.mode & 1) > 0 ||
+        ((stats.mode & 8) > 0 && stats.gid === process.getgid()) ||
+        ((stats.mode & 64) > 0 && stats.uid === process.getuid()));
+}
+// Get the path of cmd.exe in windows
+function getCmdPath() {
+    var _a;
+    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
+}
+exports.getCmdPath = getCmdPath;
+//# sourceMappingURL=io-util.js.map
+
+/***/ }),
+
+/***/ 7436:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.findInPath = exports.which = exports.mkdirP = exports.rmRF = exports.mv = exports.cp = void 0;
+const assert_1 = __nccwpck_require__(9491);
+const path = __importStar(__nccwpck_require__(1017));
+const ioUtil = __importStar(__nccwpck_require__(1962));
+/**
+ * Copies a file or folder.
+ * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
+ *
+ * @param     source    source path
+ * @param     dest      destination path
+ * @param     options   optional. See CopyOptions.
+ */
+function cp(source, dest, options = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { force, recursive, copySourceDirectory } = readCopyOptions(options);
+        const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
+        // Dest is an existing file, but not forcing
+        if (destStat && destStat.isFile() && !force) {
+            return;
+        }
+        // If dest is an existing directory, should copy inside.
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
+            ? path.join(dest, path.basename(source))
+            : dest;
+        if (!(yield ioUtil.exists(source))) {
+            throw new Error(`no such file or directory: ${source}`);
+        }
+        const sourceStat = yield ioUtil.stat(source);
+        if (sourceStat.isDirectory()) {
+            if (!recursive) {
+                throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
+            }
+            else {
+                yield cpDirRecursive(source, newDest, 0, force);
+            }
+        }
+        else {
+            if (path.relative(source, newDest) === '') {
+                // a file cannot be copied to itself
+                throw new Error(`'${newDest}' and '${source}' are the same file`);
+            }
+            yield copyFile(source, newDest, force);
+        }
+    });
+}
+exports.cp = cp;
+/**
+ * Moves a path.
+ *
+ * @param     source    source path
+ * @param     dest      destination path
+ * @param     options   optional. See MoveOptions.
+ */
+function mv(source, dest, options = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (yield ioUtil.exists(dest)) {
+            let destExists = true;
+            if (yield ioUtil.isDirectory(dest)) {
+                // If dest is directory copy src into dest
+                dest = path.join(dest, path.basename(source));
+                destExists = yield ioUtil.exists(dest);
+            }
+            if (destExists) {
+                if (options.force == null || options.force) {
+                    yield rmRF(dest);
+                }
+                else {
+                    throw new Error('Destination already exists');
+                }
+            }
+        }
+        yield mkdirP(path.dirname(dest));
+        yield ioUtil.rename(source, dest);
+    });
+}
+exports.mv = mv;
+/**
+ * Remove a path recursively with force
+ *
+ * @param inputPath path to remove
+ */
+function rmRF(inputPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (ioUtil.IS_WINDOWS) {
+            // Check for invalid characters
+            // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+            if (/[*"<>|]/.test(inputPath)) {
+                throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
+            }
+        }
+        try {
+            // note if path does not exist, error is silent
+            yield ioUtil.rm(inputPath, {
+                force: true,
+                maxRetries: 3,
+                recursive: true,
+                retryDelay: 300
+            });
+        }
+        catch (err) {
+            throw new Error(`File was unable to be removed ${err}`);
+        }
+    });
+}
+exports.rmRF = rmRF;
+/**
+ * Make a directory.  Creates the full path with folders in between
+ * Will throw if it fails
+ *
+ * @param   fsPath        path to create
+ * @returns Promise<void>
+ */
+function mkdirP(fsPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        assert_1.ok(fsPath, 'a path argument must be provided');
+        yield ioUtil.mkdir(fsPath, { recursive: true });
+    });
+}
+exports.mkdirP = mkdirP;
+/**
+ * Returns path of a tool had the tool actually been invoked.  Resolves via paths.
+ * If you check and the tool does not exist, it will throw.
+ *
+ * @param     tool              name of the tool
+ * @param     check             whether to check if tool exists
+ * @returns   Promise<string>   path to tool
+ */
+function which(tool, check) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!tool) {
+            throw new Error("parameter 'tool' is required");
+        }
+        // recursive when check=true
+        if (check) {
+            const result = yield which(tool, false);
+            if (!result) {
+                if (ioUtil.IS_WINDOWS) {
+                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.`);
+                }
+                else {
+                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
+                }
+            }
+            return result;
+        }
+        const matches = yield findInPath(tool);
+        if (matches && matches.length > 0) {
+            return matches[0];
+        }
+        return '';
+    });
+}
+exports.which = which;
+/**
+ * Returns a list of all occurrences of the given tool on the system path.
+ *
+ * @returns   Promise<string[]>  the paths of the tool
+ */
+function findInPath(tool) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!tool) {
+            throw new Error("parameter 'tool' is required");
+        }
+        // build the list of extensions to try
+        const extensions = [];
+        if (ioUtil.IS_WINDOWS && process.env['PATHEXT']) {
+            for (const extension of process.env['PATHEXT'].split(path.delimiter)) {
+                if (extension) {
+                    extensions.push(extension);
+                }
+            }
+        }
+        // if it's rooted, return it if exists. otherwise return empty.
+        if (ioUtil.isRooted(tool)) {
+            const filePath = yield ioUtil.tryGetExecutablePath(tool, extensions);
+            if (filePath) {
+                return [filePath];
+            }
+            return [];
+        }
+        // if any path separators, return empty
+        if (tool.includes(path.sep)) {
+            return [];
+        }
+        // build the list of directories
+        //
+        // Note, technically "where" checks the current directory on Windows. From a toolkit perspective,
+        // it feels like we should not do this. Checking the current directory seems like more of a use
+        // case of a shell, and the which() function exposed by the toolkit should strive for consistency
+        // across platforms.
+        const directories = [];
+        if (process.env.PATH) {
+            for (const p of process.env.PATH.split(path.delimiter)) {
+                if (p) {
+                    directories.push(p);
+                }
+            }
+        }
+        // find all matches
+        const matches = [];
+        for (const directory of directories) {
+            const filePath = yield ioUtil.tryGetExecutablePath(path.join(directory, tool), extensions);
+            if (filePath) {
+                matches.push(filePath);
+            }
+        }
+        return matches;
+    });
+}
+exports.findInPath = findInPath;
+function readCopyOptions(options) {
+    const force = options.force == null ? true : options.force;
+    const recursive = Boolean(options.recursive);
+    const copySourceDirectory = options.copySourceDirectory == null
+        ? true
+        : Boolean(options.copySourceDirectory);
+    return { force, recursive, copySourceDirectory };
+}
+function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Ensure there is not a run away recursive copy
+        if (currentDepth >= 255)
+            return;
+        currentDepth++;
+        yield mkdirP(destDir);
+        const files = yield ioUtil.readdir(sourceDir);
+        for (const fileName of files) {
+            const srcFile = `${sourceDir}/${fileName}`;
+            const destFile = `${destDir}/${fileName}`;
+            const srcFileStat = yield ioUtil.lstat(srcFile);
+            if (srcFileStat.isDirectory()) {
+                // Recurse
+                yield cpDirRecursive(srcFile, destFile, currentDepth, force);
+            }
+            else {
+                yield copyFile(srcFile, destFile, force);
+            }
+        }
+        // Change the mode for the newly created directory
+        yield ioUtil.chmod(destDir, (yield ioUtil.stat(sourceDir)).mode);
+    });
+}
+// Buffered file copy
+function copyFile(srcFile, destFile, force) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if ((yield ioUtil.lstat(srcFile)).isSymbolicLink()) {
+            // unlink/re-link it
+            try {
+                yield ioUtil.lstat(destFile);
+                yield ioUtil.unlink(destFile);
+            }
+            catch (e) {
+                // Try to override file permission
+                if (e.code === 'EPERM') {
+                    yield ioUtil.chmod(destFile, '0666');
+                    yield ioUtil.unlink(destFile);
+                }
+                // other errors = it doesn't exist, no work to do
+            }
+            // Copy over symlink
+            const symlinkFull = yield ioUtil.readlink(srcFile);
+            yield ioUtil.symlink(symlinkFull, destFile, ioUtil.IS_WINDOWS ? 'junction' : null);
+        }
+        else if (!(yield ioUtil.exists(destFile)) || force) {
+            yield ioUtil.copyFile(srcFile, destFile);
+        }
+    });
+}
+//# sourceMappingURL=io.js.map
 
 /***/ }),
 
@@ -3359,7 +4823,7 @@ module.exports = {
 "use strict";
 
 
-const binding = __nccwpck_require__(4240);
+const binding = __nccwpck_require__(5653);
 
 module.exports = binding.getCPUInfo;
 
@@ -7038,16 +8502,14 @@ class Client extends EventEmitter {
     let hostVerifier;
     if (typeof cfg.hostVerifier === 'function') {
       const hashCb = cfg.hostVerifier;
-      let hasher;
+      let hashAlgo;
       if (HASHES.indexOf(cfg.hostHash) !== -1) {
         // Default to old behavior of hashing on user's behalf
-        hasher = createHash(cfg.hostHash);
+        hashAlgo = cfg.hostHash;
       }
       hostVerifier = (key, verify) => {
-        if (hasher) {
-          hasher.update(key);
-          key = hasher.digest('hex');
-        }
+        if (hashAlgo)
+          key = createHash(hashAlgo).update(key).digest('hex');
         const ret = hashCb(key, verify);
         if (ret !== undefined)
           verify(ret);
@@ -8319,9 +9781,14 @@ class Client extends EventEmitter {
     return this;
   }
 
-  sftp(cb) {
+  sftp(env, cb) {
     if (!this._sock || !isWritable(this._sock))
       throw new Error('Not connected');
+
+    if (typeof env === 'function') {
+      cb = env;
+      env = undefined;
+    }
 
     openChannel(this, 'sftp', (err, sftp) => {
       if (err) {
@@ -8329,7 +9796,7 @@ class Client extends EventEmitter {
         return;
       }
 
-      reqSubsystem(sftp, 'sftp', (err, sftp_) => {
+      const reqSubsystemCb = (err, sftp_) => {
         if (err) {
           cb(err);
           return;
@@ -8375,7 +9842,20 @@ class Client extends EventEmitter {
             .on('close', onExit);
 
         sftp._init();
-      });
+      };
+
+      if (typeof env === 'object' && env !== null) {
+        reqEnv(sftp, env, (err) => {
+          if (err) {
+            cb(err);
+            return;
+          }
+
+          reqSubsystem(sftp, 'sftp', reqSubsystemCb);
+        });
+      } else {
+        reqSubsystem(sftp, 'sftp', reqSubsystemCb);
+      }
     });
 
     return this;
@@ -8609,16 +10089,33 @@ function reqExec(chan, cmd, opts, cb) {
   chan._client._protocol.exec(chan.outgoing.id, cmd, true);
 }
 
-function reqEnv(chan, env) {
-  if (chan.outgoing.state !== 'open')
+function reqEnv(chan, env, cb) {
+  const wantReply = (typeof cb === 'function');
+
+  if (chan.outgoing.state !== 'open') {
+    if (wantReply)
+      cb(new Error('Channel is not open'));
     return;
+  }
+
+  if (wantReply) {
+    chan._callbacks.push((had_err) => {
+      if (had_err) {
+        cb(had_err !== true
+           ? had_err
+           : new Error('Unable to set environment'));
+        return;
+      }
+      cb();
+    });
+  }
 
   const keys = Object.keys(env || {});
 
   for (let i = 0; i < keys.length; ++i) {
     const key = keys[i];
     const val = env[key];
-    chan._client._protocol.env(chan.outgoing.id, key, val, false);
+    chan._client._protocol.env(chan.outgoing.id, key, val, wantReply);
   }
 }
 
@@ -9868,11 +11365,18 @@ class Protocol {
     if (typeof offer !== 'object' || offer === null) {
       offer = (this._server ? DEFAULT_KEXINIT_SERVER : DEFAULT_KEXINIT_CLIENT);
     } else if (offer.constructor !== KexInit) {
-      if (!this._server)
-        offer.kex = offer.kex.concat(['ext-info-c']);
+      if (this._server) {
+        offer.kex = offer.kex.concat(['kex-strict-s-v00@openssh.com']);
+      } else {
+        offer.kex = offer.kex.concat([
+          'ext-info-c',
+          'kex-strict-c-v00@openssh.com',
+        ]);
+      }
       offer = new KexInit(offer);
     }
     this._kex = undefined;
+    this._strictMode = undefined;
     this._kexinit = undefined;
     this._offer = offer;
     this._cipher = new NullCipher(0, this._onWrite);
@@ -11794,7 +13298,7 @@ const {
   Readable: ReadableStream,
   Writable: WritableStream
 } = __nccwpck_require__(2781);
-const { inherits, isDate } = __nccwpck_require__(3837);
+const { inherits, types: { isDate } } = __nccwpck_require__(3837);
 
 const FastBuffer = Buffer[Symbol.species];
 
@@ -16238,7 +17742,7 @@ let AESGCMDecipher;
 let ChaChaPolyDecipher;
 let GenericDecipher;
 try {
-  binding = __nccwpck_require__(9041);
+  binding = __nccwpck_require__(9623);
   ({ AESGCMCipher, ChaChaPolyCipher, GenericCipher,
      AESGCMDecipher, ChaChaPolyDecipher, GenericDecipher } = binding);
 } catch {}
@@ -19417,13 +20921,37 @@ function handleKexInit(self, payload) {
     clientList = localKex;
     remoteExtInfoEnabled = (serverList.indexOf('ext-info-s') !== -1);
   }
+  if (self._strictMode === undefined) {
+    if (self._server) {
+      self._strictMode =
+        (clientList.indexOf('kex-strict-c-v00@openssh.com') !== -1);
+    } else {
+      self._strictMode =
+        (serverList.indexOf('kex-strict-s-v00@openssh.com') !== -1);
+    }
+    // Note: We check for seqno of 1 instead of 0 since we increment before
+    //       calling the packet handler
+    if (self._strictMode) {
+      debug && debug('Handshake: strict KEX mode enabled');
+      if (self._decipher.inSeqno !== 1) {
+        if (debug)
+          debug('Handshake: KEXINIT not first packet in strict KEX mode');
+        return doFatalError(
+          self,
+          'Handshake failed: KEXINIT not first packet in strict KEX mode',
+          'handshake',
+          DISCONNECT_REASON.KEY_EXCHANGE_FAILED
+        );
+      }
+    }
+  }
   // Check for agreeable key exchange algorithm
   for (i = 0;
        i < clientList.length && serverList.indexOf(clientList[i]) === -1;
        ++i);
   if (i === clientList.length) {
     // No suitable match found!
-    debug && debug('Handshake: No matching key exchange algorithm');
+    debug && debug('Handshake: no matching key exchange algorithm');
     return doFatalError(
       self,
       'Handshake failed: no matching key exchange algorithm',
@@ -20421,6 +21949,8 @@ const createKeyExchange = (() => {
             'Inbound: NEWKEYS'
           );
           this._receivedNEWKEYS = true;
+          if (this._protocol._strictMode)
+            this._protocol._decipher.inSeqno = 0;
           ++this._step;
 
           return this.finish(!this._protocol._server && !this._hostVerified);
@@ -20941,11 +22471,20 @@ function onKEXPayload(state, payload) {
   payload = this._packetRW.read.read(payload);
 
   const type = payload[0];
+
+  if (!this._strictMode) {
+    switch (type) {
+      case MESSAGE.IGNORE:
+      case MESSAGE.UNIMPLEMENTED:
+      case MESSAGE.DEBUG:
+        if (!MESSAGE_HANDLERS)
+          MESSAGE_HANDLERS = __nccwpck_require__(172);
+        return MESSAGE_HANDLERS[type](this, payload);
+    }
+  }
+
   switch (type) {
     case MESSAGE.DISCONNECT:
-    case MESSAGE.IGNORE:
-    case MESSAGE.UNIMPLEMENTED:
-    case MESSAGE.DEBUG:
       if (!MESSAGE_HANDLERS)
         MESSAGE_HANDLERS = __nccwpck_require__(172);
       return MESSAGE_HANDLERS[type](this, payload);
@@ -20961,6 +22500,8 @@ function onKEXPayload(state, payload) {
       state.firstPacket = false;
       return handleKexInit(this, payload);
     default:
+      // Ensure packet is either an algorithm negotiation or KEX
+      // algorithm-specific packet
       if (type < 20 || type > 49) {
         return doFatalError(
           this,
@@ -21009,6 +22550,8 @@ function trySendNEWKEYS(kex) {
       kex._protocol._packetRW.write.finalize(packet, true)
     );
     kex._sentNEWKEYS = true;
+    if (kex._protocol._strictMode)
+      kex._protocol._cipher.outSeqno = 0;
   }
 }
 
@@ -21017,7 +22560,7 @@ module.exports = {
   kexinit,
   onKEXPayload,
   DEFAULT_KEXINIT_CLIENT: new KexInit({
-    kex: DEFAULT_KEX.concat(['ext-info-c']),
+    kex: DEFAULT_KEX.concat(['ext-info-c', 'kex-strict-c-v00@openssh.com']),
     serverHostKey: DEFAULT_SERVER_HOST_KEY,
     cs: {
       cipher: DEFAULT_CIPHER,
@@ -21033,7 +22576,7 @@ module.exports = {
     },
   }),
   DEFAULT_KEXINIT_SERVER: new KexInit({
-    kex: DEFAULT_KEX,
+    kex: DEFAULT_KEX.concat(['kex-strict-s-v00@openssh.com']),
     serverHostKey: DEFAULT_SERVER_HOST_KEY,
     cs: {
       cipher: DEFAULT_CIPHER,
@@ -21508,7 +23051,7 @@ const BaseKey = {
       this.type === parsed.type
       && this[SYM_PRIV_PEM] === parsed[SYM_PRIV_PEM]
       && this[SYM_PUB_PEM] === parsed[SYM_PUB_PEM]
-      && this[SYM_PUB_SSH] === parsed[SYM_PUB_SSH]
+      && this[SYM_PUB_SSH].equals(parsed[SYM_PUB_SSH])
     );
   },
 };
@@ -23598,7 +25141,11 @@ class Server extends EventEmitter {
     }
 
     const algorithms = {
-      kex: generateAlgorithmList(cfgAlgos.kex, DEFAULT_KEX, SUPPORTED_KEX),
+      kex: generateAlgorithmList(
+        cfgAlgos.kex,
+        DEFAULT_KEX,
+        SUPPORTED_KEX
+      ).concat(['kex-strict-s-v00@openssh.com']),
       serverHostKey: hostKeyAlgoOrder,
       cs: {
         cipher: generateAlgorithmList(
@@ -27701,864 +29248,122 @@ nacl.setPRNG = function(fn) {
 
 /***/ }),
 
-/***/ 5840:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-Object.defineProperty(exports, "v1", ({
-  enumerable: true,
-  get: function () {
-    return _v.default;
-  }
-}));
-Object.defineProperty(exports, "v3", ({
-  enumerable: true,
-  get: function () {
-    return _v2.default;
-  }
-}));
-Object.defineProperty(exports, "v4", ({
-  enumerable: true,
-  get: function () {
-    return _v3.default;
-  }
-}));
-Object.defineProperty(exports, "v5", ({
-  enumerable: true,
-  get: function () {
-    return _v4.default;
-  }
-}));
-Object.defineProperty(exports, "NIL", ({
-  enumerable: true,
-  get: function () {
-    return _nil.default;
-  }
-}));
-Object.defineProperty(exports, "version", ({
-  enumerable: true,
-  get: function () {
-    return _version.default;
-  }
-}));
-Object.defineProperty(exports, "validate", ({
-  enumerable: true,
-  get: function () {
-    return _validate.default;
-  }
-}));
-Object.defineProperty(exports, "stringify", ({
-  enumerable: true,
-  get: function () {
-    return _stringify.default;
-  }
-}));
-Object.defineProperty(exports, "parse", ({
-  enumerable: true,
-  get: function () {
-    return _parse.default;
-  }
-}));
-
-var _v = _interopRequireDefault(__nccwpck_require__(8628));
-
-var _v2 = _interopRequireDefault(__nccwpck_require__(6409));
-
-var _v3 = _interopRequireDefault(__nccwpck_require__(5122));
-
-var _v4 = _interopRequireDefault(__nccwpck_require__(9120));
-
-var _nil = _interopRequireDefault(__nccwpck_require__(5332));
-
-var _version = _interopRequireDefault(__nccwpck_require__(1595));
-
-var _validate = _interopRequireDefault(__nccwpck_require__(6900));
-
-var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
-
-var _parse = _interopRequireDefault(__nccwpck_require__(2746));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/***/ }),
-
-/***/ 4569:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function md5(bytes) {
-  if (Array.isArray(bytes)) {
-    bytes = Buffer.from(bytes);
-  } else if (typeof bytes === 'string') {
-    bytes = Buffer.from(bytes, 'utf8');
-  }
-
-  return _crypto.default.createHash('md5').update(bytes).digest();
-}
-
-var _default = md5;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 5332:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-var _default = '00000000-0000-0000-0000-000000000000';
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 2746:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _validate = _interopRequireDefault(__nccwpck_require__(6900));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function parse(uuid) {
-  if (!(0, _validate.default)(uuid)) {
-    throw TypeError('Invalid UUID');
-  }
-
-  let v;
-  const arr = new Uint8Array(16); // Parse ########-....-....-....-............
-
-  arr[0] = (v = parseInt(uuid.slice(0, 8), 16)) >>> 24;
-  arr[1] = v >>> 16 & 0xff;
-  arr[2] = v >>> 8 & 0xff;
-  arr[3] = v & 0xff; // Parse ........-####-....-....-............
-
-  arr[4] = (v = parseInt(uuid.slice(9, 13), 16)) >>> 8;
-  arr[5] = v & 0xff; // Parse ........-....-####-....-............
-
-  arr[6] = (v = parseInt(uuid.slice(14, 18), 16)) >>> 8;
-  arr[7] = v & 0xff; // Parse ........-....-....-####-............
-
-  arr[8] = (v = parseInt(uuid.slice(19, 23), 16)) >>> 8;
-  arr[9] = v & 0xff; // Parse ........-....-....-....-############
-  // (Use "/" to avoid 32-bit truncation when bit-shifting high-order bytes)
-
-  arr[10] = (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff;
-  arr[11] = v / 0x100000000 & 0xff;
-  arr[12] = v >>> 24 & 0xff;
-  arr[13] = v >>> 16 & 0xff;
-  arr[14] = v >>> 8 & 0xff;
-  arr[15] = v & 0xff;
-  return arr;
-}
-
-var _default = parse;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 814:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-var _default = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 807:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = rng;
-
-var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const rnds8Pool = new Uint8Array(256); // # of random values to pre-allocate
-
-let poolPtr = rnds8Pool.length;
-
-function rng() {
-  if (poolPtr > rnds8Pool.length - 16) {
-    _crypto.default.randomFillSync(rnds8Pool);
-
-    poolPtr = 0;
-  }
-
-  return rnds8Pool.slice(poolPtr, poolPtr += 16);
-}
-
-/***/ }),
-
-/***/ 5274:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function sha1(bytes) {
-  if (Array.isArray(bytes)) {
-    bytes = Buffer.from(bytes);
-  } else if (typeof bytes === 'string') {
-    bytes = Buffer.from(bytes, 'utf8');
-  }
-
-  return _crypto.default.createHash('sha1').update(bytes).digest();
-}
-
-var _default = sha1;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 8950:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _validate = _interopRequireDefault(__nccwpck_require__(6900));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/**
- * Convert array of 16 byte values to UUID string format of the form:
- * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
- */
-const byteToHex = [];
-
-for (let i = 0; i < 256; ++i) {
-  byteToHex.push((i + 0x100).toString(16).substr(1));
-}
-
-function stringify(arr, offset = 0) {
-  // Note: Be careful editing this code!  It's been tuned for performance
-  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
-  const uuid = (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase(); // Consistency check for valid UUID.  If this throws, it's likely due to one
-  // of the following:
-  // - One or more input array values don't map to a hex octet (leading to
-  // "undefined" in the uuid)
-  // - Invalid input values for the RFC `version` or `variant` fields
-
-  if (!(0, _validate.default)(uuid)) {
-    throw TypeError('Stringified UUID is invalid');
-  }
-
-  return uuid;
-}
-
-var _default = stringify;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 8628:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _rng = _interopRequireDefault(__nccwpck_require__(807));
-
-var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-// **`v1()` - Generate time-based UUID**
-//
-// Inspired by https://github.com/LiosK/UUID.js
-// and http://docs.python.org/library/uuid.html
-let _nodeId;
-
-let _clockseq; // Previous uuid creation time
-
-
-let _lastMSecs = 0;
-let _lastNSecs = 0; // See https://github.com/uuidjs/uuid for API details
-
-function v1(options, buf, offset) {
-  let i = buf && offset || 0;
-  const b = buf || new Array(16);
-  options = options || {};
-  let node = options.node || _nodeId;
-  let clockseq = options.clockseq !== undefined ? options.clockseq : _clockseq; // node and clockseq need to be initialized to random values if they're not
-  // specified.  We do this lazily to minimize issues related to insufficient
-  // system entropy.  See #189
-
-  if (node == null || clockseq == null) {
-    const seedBytes = options.random || (options.rng || _rng.default)();
-
-    if (node == null) {
-      // Per 4.5, create and 48-bit node id, (47 random bits + multicast bit = 1)
-      node = _nodeId = [seedBytes[0] | 0x01, seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
-    }
-
-    if (clockseq == null) {
-      // Per 4.2.2, randomize (14 bit) clockseq
-      clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 0x3fff;
-    }
-  } // UUID timestamps are 100 nano-second units since the Gregorian epoch,
-  // (1582-10-15 00:00).  JSNumbers aren't precise enough for this, so
-  // time is handled internally as 'msecs' (integer milliseconds) and 'nsecs'
-  // (100-nanoseconds offset from msecs) since unix epoch, 1970-01-01 00:00.
-
-
-  let msecs = options.msecs !== undefined ? options.msecs : Date.now(); // Per 4.2.1.2, use count of uuid's generated during the current clock
-  // cycle to simulate higher resolution clock
-
-  let nsecs = options.nsecs !== undefined ? options.nsecs : _lastNSecs + 1; // Time since last uuid creation (in msecs)
-
-  const dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 10000; // Per 4.2.1.2, Bump clockseq on clock regression
-
-  if (dt < 0 && options.clockseq === undefined) {
-    clockseq = clockseq + 1 & 0x3fff;
-  } // Reset nsecs if clock regresses (new clockseq) or we've moved onto a new
-  // time interval
-
-
-  if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === undefined) {
-    nsecs = 0;
-  } // Per 4.2.1.2 Throw error if too many uuids are requested
-
-
-  if (nsecs >= 10000) {
-    throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
-  }
-
-  _lastMSecs = msecs;
-  _lastNSecs = nsecs;
-  _clockseq = clockseq; // Per 4.1.4 - Convert from unix epoch to Gregorian epoch
-
-  msecs += 12219292800000; // `time_low`
-
-  const tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
-  b[i++] = tl >>> 24 & 0xff;
-  b[i++] = tl >>> 16 & 0xff;
-  b[i++] = tl >>> 8 & 0xff;
-  b[i++] = tl & 0xff; // `time_mid`
-
-  const tmh = msecs / 0x100000000 * 10000 & 0xfffffff;
-  b[i++] = tmh >>> 8 & 0xff;
-  b[i++] = tmh & 0xff; // `time_high_and_version`
-
-  b[i++] = tmh >>> 24 & 0xf | 0x10; // include version
-
-  b[i++] = tmh >>> 16 & 0xff; // `clock_seq_hi_and_reserved` (Per 4.2.2 - include variant)
-
-  b[i++] = clockseq >>> 8 | 0x80; // `clock_seq_low`
-
-  b[i++] = clockseq & 0xff; // `node`
-
-  for (let n = 0; n < 6; ++n) {
-    b[i + n] = node[n];
-  }
-
-  return buf || (0, _stringify.default)(b);
-}
-
-var _default = v1;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 6409:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _v = _interopRequireDefault(__nccwpck_require__(5998));
-
-var _md = _interopRequireDefault(__nccwpck_require__(4569));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const v3 = (0, _v.default)('v3', 0x30, _md.default);
-var _default = v3;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 5998:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = _default;
-exports.URL = exports.DNS = void 0;
-
-var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
-
-var _parse = _interopRequireDefault(__nccwpck_require__(2746));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function stringToBytes(str) {
-  str = unescape(encodeURIComponent(str)); // UTF8 escape
-
-  const bytes = [];
-
-  for (let i = 0; i < str.length; ++i) {
-    bytes.push(str.charCodeAt(i));
-  }
-
-  return bytes;
-}
-
-const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-exports.DNS = DNS;
-const URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
-exports.URL = URL;
-
-function _default(name, version, hashfunc) {
-  function generateUUID(value, namespace, buf, offset) {
-    if (typeof value === 'string') {
-      value = stringToBytes(value);
-    }
-
-    if (typeof namespace === 'string') {
-      namespace = (0, _parse.default)(namespace);
-    }
-
-    if (namespace.length !== 16) {
-      throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
-    } // Compute hash of namespace and value, Per 4.3
-    // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
-    // hashfunc([...namespace, ... value])`
-
-
-    let bytes = new Uint8Array(16 + value.length);
-    bytes.set(namespace);
-    bytes.set(value, namespace.length);
-    bytes = hashfunc(bytes);
-    bytes[6] = bytes[6] & 0x0f | version;
-    bytes[8] = bytes[8] & 0x3f | 0x80;
-
-    if (buf) {
-      offset = offset || 0;
-
-      for (let i = 0; i < 16; ++i) {
-        buf[offset + i] = bytes[i];
-      }
-
-      return buf;
-    }
-
-    return (0, _stringify.default)(bytes);
-  } // Function#name is not settable on some platforms (#270)
-
-
-  try {
-    generateUUID.name = name; // eslint-disable-next-line no-empty
-  } catch (err) {} // For CommonJS default export support
-
-
-  generateUUID.DNS = DNS;
-  generateUUID.URL = URL;
-  return generateUUID;
-}
-
-/***/ }),
-
-/***/ 5122:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _rng = _interopRequireDefault(__nccwpck_require__(807));
-
-var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function v4(options, buf, offset) {
-  options = options || {};
-
-  const rnds = options.random || (options.rng || _rng.default)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
-
-
-  rnds[6] = rnds[6] & 0x0f | 0x40;
-  rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
-
-  if (buf) {
-    offset = offset || 0;
-
-    for (let i = 0; i < 16; ++i) {
-      buf[offset + i] = rnds[i];
-    }
-
-    return buf;
-  }
-
-  return (0, _stringify.default)(rnds);
-}
-
-var _default = v4;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 9120:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _v = _interopRequireDefault(__nccwpck_require__(5998));
-
-var _sha = _interopRequireDefault(__nccwpck_require__(5274));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const v5 = (0, _v.default)('v5', 0x50, _sha.default);
-var _default = v5;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 6900:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _regex = _interopRequireDefault(__nccwpck_require__(814));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function validate(uuid) {
-  return typeof uuid === 'string' && _regex.default.test(uuid);
-}
-
-var _default = validate;
-exports["default"] = _default;
-
-/***/ }),
-
-/***/ 1595:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({
-  value: true
-}));
-exports["default"] = void 0;
-
-var _validate = _interopRequireDefault(__nccwpck_require__(6900));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function version(uuid) {
-  if (!(0, _validate.default)(uuid)) {
-    throw TypeError('Invalid UUID');
-  }
-
-  return parseInt(uuid.substr(14, 1), 16);
-}
-
-var _default = version;
-exports["default"] = _default;
-
-/***/ }),
-
 /***/ 7527:
 /***/ ((module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = void 0;
-
 var _toDate = _interopRequireDefault(__nccwpck_require__(3834));
-
 var _toFloat = _interopRequireDefault(__nccwpck_require__(2429));
-
 var _toInt = _interopRequireDefault(__nccwpck_require__(5237));
-
 var _toBoolean = _interopRequireDefault(__nccwpck_require__(1960));
-
 var _equals = _interopRequireDefault(__nccwpck_require__(6356));
-
 var _contains = _interopRequireDefault(__nccwpck_require__(6025));
-
 var _matches = _interopRequireDefault(__nccwpck_require__(9189));
-
 var _isEmail = _interopRequireDefault(__nccwpck_require__(1324));
-
 var _isURL = _interopRequireDefault(__nccwpck_require__(1793));
-
 var _isMACAddress = _interopRequireDefault(__nccwpck_require__(7912));
-
 var _isIP = _interopRequireDefault(__nccwpck_require__(8253));
-
 var _isIPRange = _interopRequireDefault(__nccwpck_require__(6896));
-
 var _isFQDN = _interopRequireDefault(__nccwpck_require__(5627));
-
 var _isDate = _interopRequireDefault(__nccwpck_require__(4845));
-
 var _isTime = _interopRequireDefault(__nccwpck_require__(9527));
-
 var _isBoolean = _interopRequireDefault(__nccwpck_require__(2276));
-
 var _isLocale = _interopRequireDefault(__nccwpck_require__(4513));
-
+var _isAbaRouting = _interopRequireDefault(__nccwpck_require__(9639));
 var _isAlpha = _interopRequireWildcard(__nccwpck_require__(899));
-
 var _isAlphanumeric = _interopRequireWildcard(__nccwpck_require__(8317));
-
 var _isNumeric = _interopRequireDefault(__nccwpck_require__(3769));
-
-var _isPassportNumber = _interopRequireDefault(__nccwpck_require__(33));
-
+var _isPassportNumber = _interopRequireWildcard(__nccwpck_require__(33));
 var _isPort = _interopRequireDefault(__nccwpck_require__(5985));
-
 var _isLowercase = _interopRequireDefault(__nccwpck_require__(6509));
-
 var _isUppercase = _interopRequireDefault(__nccwpck_require__(6413));
-
 var _isIMEI = _interopRequireDefault(__nccwpck_require__(9927));
-
 var _isAscii = _interopRequireDefault(__nccwpck_require__(4433));
-
 var _isFullWidth = _interopRequireDefault(__nccwpck_require__(2619));
-
 var _isHalfWidth = _interopRequireDefault(__nccwpck_require__(2176));
-
 var _isVariableWidth = _interopRequireDefault(__nccwpck_require__(8678));
-
 var _isMultibyte = _interopRequireDefault(__nccwpck_require__(2672));
-
 var _isSemVer = _interopRequireDefault(__nccwpck_require__(2493));
-
 var _isSurrogatePair = _interopRequireDefault(__nccwpck_require__(4901));
-
 var _isInt = _interopRequireDefault(__nccwpck_require__(7205));
-
 var _isFloat = _interopRequireWildcard(__nccwpck_require__(3158));
-
 var _isDecimal = _interopRequireDefault(__nccwpck_require__(597));
-
 var _isHexadecimal = _interopRequireDefault(__nccwpck_require__(6262));
-
 var _isOctal = _interopRequireDefault(__nccwpck_require__(9193));
-
 var _isDivisibleBy = _interopRequireDefault(__nccwpck_require__(4098));
-
 var _isHexColor = _interopRequireDefault(__nccwpck_require__(1992));
-
 var _isRgbColor = _interopRequireDefault(__nccwpck_require__(8329));
-
 var _isHSL = _interopRequireDefault(__nccwpck_require__(429));
-
 var _isISRC = _interopRequireDefault(__nccwpck_require__(9032));
-
 var _isIBAN = _interopRequireWildcard(__nccwpck_require__(8111));
-
 var _isBIC = _interopRequireDefault(__nccwpck_require__(5776));
-
 var _isMD = _interopRequireDefault(__nccwpck_require__(3084));
-
 var _isHash = _interopRequireDefault(__nccwpck_require__(9841));
-
 var _isJWT = _interopRequireDefault(__nccwpck_require__(8300));
-
 var _isJSON = _interopRequireDefault(__nccwpck_require__(9812));
-
 var _isEmpty = _interopRequireDefault(__nccwpck_require__(2585));
-
 var _isLength = _interopRequireDefault(__nccwpck_require__(2041));
-
 var _isByteLength = _interopRequireDefault(__nccwpck_require__(3189));
-
+var _isULID = _interopRequireDefault(__nccwpck_require__(7768));
 var _isUUID = _interopRequireDefault(__nccwpck_require__(6455));
-
 var _isMongoId = _interopRequireDefault(__nccwpck_require__(1296));
-
 var _isAfter = _interopRequireDefault(__nccwpck_require__(471));
-
 var _isBefore = _interopRequireDefault(__nccwpck_require__(9367));
-
 var _isIn = _interopRequireDefault(__nccwpck_require__(2353));
-
 var _isLuhnNumber = _interopRequireDefault(__nccwpck_require__(5912));
-
 var _isCreditCard = _interopRequireDefault(__nccwpck_require__(1419));
-
 var _isIdentityCard = _interopRequireDefault(__nccwpck_require__(9778));
-
 var _isEAN = _interopRequireDefault(__nccwpck_require__(7597));
-
 var _isISIN = _interopRequireDefault(__nccwpck_require__(9187));
-
 var _isISBN = _interopRequireDefault(__nccwpck_require__(8254));
-
 var _isISSN = _interopRequireDefault(__nccwpck_require__(7609));
-
 var _isTaxID = _interopRequireDefault(__nccwpck_require__(578));
-
 var _isMobilePhone = _interopRequireWildcard(__nccwpck_require__(8648));
-
 var _isEthereumAddress = _interopRequireDefault(__nccwpck_require__(7938));
-
 var _isCurrency = _interopRequireDefault(__nccwpck_require__(5429));
-
 var _isBtcAddress = _interopRequireDefault(__nccwpck_require__(6185));
-
-var _isISO = _interopRequireDefault(__nccwpck_require__(7242));
-
-var _isISO2 = _interopRequireDefault(__nccwpck_require__(3790));
-
+var _isISO = __nccwpck_require__(7446);
+var _isISO2 = _interopRequireDefault(__nccwpck_require__(7242));
+var _isISO3 = _interopRequireDefault(__nccwpck_require__(3790));
 var _isRFC = _interopRequireDefault(__nccwpck_require__(7397));
-
+var _isISO4 = _interopRequireDefault(__nccwpck_require__(8426));
 var _isISO31661Alpha = _interopRequireDefault(__nccwpck_require__(3442));
-
 var _isISO31661Alpha2 = _interopRequireDefault(__nccwpck_require__(5923));
-
-var _isISO3 = _interopRequireDefault(__nccwpck_require__(909));
-
+var _isISO31661Numeric = _interopRequireDefault(__nccwpck_require__(1215));
+var _isISO5 = _interopRequireDefault(__nccwpck_require__(909));
 var _isBase = _interopRequireDefault(__nccwpck_require__(6135));
-
 var _isBase2 = _interopRequireDefault(__nccwpck_require__(2207));
-
 var _isBase3 = _interopRequireDefault(__nccwpck_require__(7003));
-
 var _isDataURI = _interopRequireDefault(__nccwpck_require__(2977));
-
 var _isMagnetURI = _interopRequireDefault(__nccwpck_require__(8693));
-
+var _isMailtoURI = _interopRequireDefault(__nccwpck_require__(4149));
 var _isMimeType = _interopRequireDefault(__nccwpck_require__(6914));
-
 var _isLatLong = _interopRequireDefault(__nccwpck_require__(1607));
-
 var _isPostalCode = _interopRequireWildcard(__nccwpck_require__(5517));
-
 var _ltrim = _interopRequireDefault(__nccwpck_require__(7622));
-
 var _rtrim = _interopRequireDefault(__nccwpck_require__(8213));
-
 var _trim = _interopRequireDefault(__nccwpck_require__(3495));
-
 var _escape = _interopRequireDefault(__nccwpck_require__(9722));
-
 var _unescape = _interopRequireDefault(__nccwpck_require__(2224));
-
 var _stripLow = _interopRequireDefault(__nccwpck_require__(1117));
-
 var _whitelist = _interopRequireDefault(__nccwpck_require__(6235));
-
 var _blacklist = _interopRequireDefault(__nccwpck_require__(2316));
-
 var _isWhitelisted = _interopRequireDefault(__nccwpck_require__(2124));
-
 var _normalizeEmail = _interopRequireDefault(__nccwpck_require__(1733));
-
 var _isSlug = _interopRequireDefault(__nccwpck_require__(2140));
-
 var _isLicensePlate = _interopRequireDefault(__nccwpck_require__(2901));
-
 var _isStrongPassword = _interopRequireDefault(__nccwpck_require__(1792));
-
 var _isVAT = _interopRequireDefault(__nccwpck_require__(4551));
-
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function _getRequireWildcardCache() { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var version = '13.9.0';
+function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function _interopRequireWildcard(e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != _typeof(e) && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (var _t in e) "default" !== _t && {}.hasOwnProperty.call(e, _t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, _t)) && (i.get || i.set) ? o(f, _t, i) : f[_t] = e[_t]); return f; })(e, t); }
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var version = '13.15.35';
 var validator = {
   version: version,
   toDate: _toDate.default,
@@ -28577,12 +29382,14 @@ var validator = {
   isBoolean: _isBoolean.default,
   isIBAN: _isIBAN.default,
   isBIC: _isBIC.default,
+  isAbaRouting: _isAbaRouting.default,
   isAlpha: _isAlpha.default,
   isAlphaLocales: _isAlpha.locales,
   isAlphanumeric: _isAlphanumeric.default,
   isAlphanumericLocales: _isAlphanumeric.locales,
   isNumeric: _isNumeric.default,
   isPassportNumber: _isPassportNumber.default,
+  passportNumberLocales: _isPassportNumber.locales,
   isPort: _isPort.default,
   isLowercase: _isLowercase.default,
   isUppercase: _isUppercase.default,
@@ -28613,6 +29420,7 @@ var validator = {
   isLength: _isLength.default,
   isLocale: _isLocale.default,
   isByteLength: _isByteLength.default,
+  isULID: _isULID.default,
   isUUID: _isUUID.default,
   isMongoId: _isMongoId.default,
   isAfter: _isAfter.default,
@@ -28632,17 +29440,22 @@ var validator = {
   isEthereumAddress: _isEthereumAddress.default,
   isCurrency: _isCurrency.default,
   isBtcAddress: _isBtcAddress.default,
-  isISO6391: _isISO.default,
-  isISO8601: _isISO2.default,
+  isISO6346: _isISO.isISO6346,
+  isFreightContainerID: _isISO.isFreightContainerID,
+  isISO6391: _isISO2.default,
+  isISO8601: _isISO3.default,
+  isISO15924: _isISO4.default,
   isRFC3339: _isRFC.default,
   isISO31661Alpha2: _isISO31661Alpha.default,
   isISO31661Alpha3: _isISO31661Alpha2.default,
-  isISO4217: _isISO3.default,
+  isISO31661Numeric: _isISO31661Numeric.default,
+  isISO4217: _isISO5.default,
   isBase32: _isBase.default,
   isBase58: _isBase2.default,
   isBase64: _isBase3.default,
   isDataURI: _isDataURI.default,
   isMagnetURI: _isMagnetURI.default,
+  isMailtoURI: _isMailtoURI.default,
   isMimeType: _isMimeType.default,
   isLatLong: _isLatLong.default,
   ltrim: _ltrim.default,
@@ -28665,8 +29478,7 @@ var validator = {
   isVAT: _isVAT.default,
   ibanLocales: _isIBAN.locales
 };
-var _default = validator;
-exports["default"] = _default;
+var _default = exports["default"] = validator;
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28681,8 +29493,8 @@ module.exports["default"] = exports.default;
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.commaDecimal = exports.dotDecimal = exports.bengaliLocales = exports.farsiLocales = exports.arabicLocales = exports.englishLocales = exports.decimal = exports.alphanumeric = exports.alpha = void 0;
-var alpha = {
+exports.farsiLocales = exports.englishLocales = exports.dotDecimal = exports.decimal = exports.commaDecimal = exports.bengaliLocales = exports.arabicLocales = exports.alphanumeric = exports.alpha = void 0;
+var alpha = exports.alpha = {
   'en-US': /^[A-Z]+$/i,
   'az-AZ': /^[A-VXYZÇƏĞİıÖŞÜ]+$/i,
   'bg-BG': /^[А-Я]+$/i,
@@ -28703,6 +29515,7 @@ var alpha = {
   'pl-PL': /^[A-ZĄĆĘŚŁŃÓŻŹ]+$/i,
   'pt-PT': /^[A-ZÃÁÀÂÄÇÉÊËÍÏÕÓÔÖÚÜ]+$/i,
   'ru-RU': /^[А-ЯЁ]+$/i,
+  'kk-KZ': /^[А-ЯЁ\u04D8\u04B0\u0406\u04A2\u0492\u04AE\u049A\u04E8\u04BA]+$/i,
   'sl-SI': /^[A-ZČĆĐŠŽ]+$/i,
   'sk-SK': /^[A-ZÁČĎÉÍŇÓŠŤÚÝŽĹŔĽÄÔ]+$/i,
   'sr-RS@latin': /^[A-ZČĆŽŠĐ]+$/i,
@@ -28718,11 +29531,18 @@ var alpha = {
   he: /^[א-ת]+$/,
   fa: /^['آاءأؤئبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهةی']+$/i,
   bn: /^['ঀঁংঃঅআইঈউঊঋঌএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ়ঽািীুূৃৄেৈোৌ্ৎৗড়ঢ়য়ৠৡৢৣৰৱ৲৳৴৵৶৷৸৹৺৻']+$/,
+  eo: /^[ABCĈD-GĜHĤIJĴK-PRSŜTUŬVZ]+$/i,
   'hi-IN': /^[\u0900-\u0961]+[\u0972-\u097F]*$/i,
-  'si-LK': /^[\u0D80-\u0DFF]+$/
+  'si-LK': /^[\u0D80-\u0DFF]+$/,
+  'ta-IN': /^[\u0B80-\u0BFF]+$/i,
+  'te-IN': /^[\u0C00-\u0C7F]+$/i,
+  'kn-IN': /^[\u0C80-\u0CFF]+$/i,
+  'ml-IN': /^[\u0D00-\u0D7F]+$/i,
+  'gu-IN': /^[\u0A80-\u0AFF]+$/i,
+  'pa-IN': /^[\u0A00-\u0A7F]+$/i,
+  'or-IN': /^[\u0B00-\u0B7F]+$/i
 };
-exports.alpha = alpha;
-var alphanumeric = {
+var alphanumeric = exports.alphanumeric = {
   'en-US': /^[0-9A-Z]+$/i,
   'az-AZ': /^[0-9A-VXYZÇƏĞİıÖŞÜ]+$/i,
   'bg-BG': /^[0-9А-Я]+$/i,
@@ -28742,6 +29562,7 @@ var alphanumeric = {
   'pl-PL': /^[0-9A-ZĄĆĘŚŁŃÓŻŹ]+$/i,
   'pt-PT': /^[0-9A-ZÃÁÀÂÄÇÉÊËÍÏÕÓÔÖÚÜ]+$/i,
   'ru-RU': /^[0-9А-ЯЁ]+$/i,
+  'kk-KZ': /^[0-9А-ЯЁ\u04D8\u04B0\u0406\u04A2\u0492\u04AE\u049A\u04E8\u04BA]+$/i,
   'sl-SI': /^[0-9A-ZČĆĐŠŽ]+$/i,
   'sk-SK': /^[0-9A-ZÁČĎÉÍŇÓŠŤÚÝŽĹŔĽÄÔ]+$/i,
   'sr-RS@latin': /^[0-9A-ZČĆŽŠĐ]+$/i,
@@ -28757,79 +29578,72 @@ var alphanumeric = {
   he: /^[0-9א-ת]+$/,
   fa: /^['0-9آاءأؤئبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهةی۱۲۳۴۵۶۷۸۹۰']+$/i,
   bn: /^['ঀঁংঃঅআইঈউঊঋঌএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ়ঽািীুূৃৄেৈোৌ্ৎৗড়ঢ়য়ৠৡৢৣ০১২৩৪৫৬৭৮৯ৰৱ৲৳৴৵৶৷৸৹৺৻']+$/,
+  eo: /^[0-9ABCĈD-GĜHĤIJĴK-PRSŜTUŬVZ]+$/i,
   'hi-IN': /^[\u0900-\u0963]+[\u0966-\u097F]*$/i,
-  'si-LK': /^[0-9\u0D80-\u0DFF]+$/
+  'si-LK': /^[0-9\u0D80-\u0DFF]+$/,
+  'ta-IN': /^[0-9\u0B80-\u0BFF.]+$/i,
+  'te-IN': /^[0-9\u0C00-\u0C7F.]+$/i,
+  'kn-IN': /^[0-9\u0C80-\u0CFF.]+$/i,
+  'ml-IN': /^[0-9\u0D00-\u0D7F.]+$/i,
+  'gu-IN': /^[0-9\u0A80-\u0AFF.]+$/i,
+  'pa-IN': /^[0-9\u0A00-\u0A7F.]+$/i,
+  'or-IN': /^[0-9\u0B00-\u0B7F.]+$/i
 };
-exports.alphanumeric = alphanumeric;
-var decimal = {
+var decimal = exports.decimal = {
   'en-US': '.',
   ar: '٫'
 };
-exports.decimal = decimal;
-var englishLocales = ['AU', 'GB', 'HK', 'IN', 'NZ', 'ZA', 'ZM'];
-exports.englishLocales = englishLocales;
-
+var englishLocales = exports.englishLocales = ['AU', 'GB', 'HK', 'IN', 'NZ', 'ZA', 'ZM'];
 for (var locale, i = 0; i < englishLocales.length; i++) {
   locale = "en-".concat(englishLocales[i]);
   alpha[locale] = alpha['en-US'];
   alphanumeric[locale] = alphanumeric['en-US'];
   decimal[locale] = decimal['en-US'];
-} // Source: http://www.localeplanet.com/java/
+}
 
-
-var arabicLocales = ['AE', 'BH', 'DZ', 'EG', 'IQ', 'JO', 'KW', 'LB', 'LY', 'MA', 'QM', 'QA', 'SA', 'SD', 'SY', 'TN', 'YE'];
-exports.arabicLocales = arabicLocales;
-
+// Source: http://www.localeplanet.com/java/
+var arabicLocales = exports.arabicLocales = ['AE', 'BH', 'DZ', 'EG', 'IQ', 'JO', 'KW', 'LB', 'LY', 'MA', 'QM', 'QA', 'SA', 'SD', 'SY', 'TN', 'YE'];
 for (var _locale, _i = 0; _i < arabicLocales.length; _i++) {
   _locale = "ar-".concat(arabicLocales[_i]);
   alpha[_locale] = alpha.ar;
   alphanumeric[_locale] = alphanumeric.ar;
   decimal[_locale] = decimal.ar;
 }
-
-var farsiLocales = ['IR', 'AF'];
-exports.farsiLocales = farsiLocales;
-
+var farsiLocales = exports.farsiLocales = ['IR', 'AF'];
 for (var _locale2, _i2 = 0; _i2 < farsiLocales.length; _i2++) {
   _locale2 = "fa-".concat(farsiLocales[_i2]);
   alphanumeric[_locale2] = alphanumeric.fa;
   decimal[_locale2] = decimal.ar;
 }
-
-var bengaliLocales = ['BD', 'IN'];
-exports.bengaliLocales = bengaliLocales;
-
+var bengaliLocales = exports.bengaliLocales = ['BD', 'IN'];
 for (var _locale3, _i3 = 0; _i3 < bengaliLocales.length; _i3++) {
   _locale3 = "bn-".concat(bengaliLocales[_i3]);
   alpha[_locale3] = alpha.bn;
   alphanumeric[_locale3] = alphanumeric.bn;
   decimal[_locale3] = decimal['en-US'];
-} // Source: https://en.wikipedia.org/wiki/Decimal_mark
+}
 
-
-var dotDecimal = ['ar-EG', 'ar-LB', 'ar-LY'];
-exports.dotDecimal = dotDecimal;
-var commaDecimal = ['bg-BG', 'cs-CZ', 'da-DK', 'de-DE', 'el-GR', 'en-ZM', 'es-ES', 'fr-CA', 'fr-FR', 'id-ID', 'it-IT', 'ku-IQ', 'hi-IN', 'hu-HU', 'nb-NO', 'nn-NO', 'nl-NL', 'pl-PL', 'pt-PT', 'ru-RU', 'si-LK', 'sl-SI', 'sr-RS@latin', 'sr-RS', 'sv-SE', 'tr-TR', 'uk-UA', 'vi-VN'];
-exports.commaDecimal = commaDecimal;
-
+// Source: https://en.wikipedia.org/wiki/Decimal_mark
+var dotDecimal = exports.dotDecimal = ['ar-EG', 'ar-LB', 'ar-LY'];
+var commaDecimal = exports.commaDecimal = ['bg-BG', 'cs-CZ', 'da-DK', 'de-DE', 'el-GR', 'en-ZM', 'eo', 'es-ES', 'fr-CA', 'fr-FR', 'gu-IN', 'hi-IN', 'hu-HU', 'id-ID', 'it-IT', 'kk-KZ', 'kn-IN', 'ku-IQ', 'ml-IN', 'nb-NO', 'nl-NL', 'nn-NO', 'or-IN', 'pa-IN', 'pl-PL', 'pt-PT', 'ru-RU', 'si-LK', 'sl-SI', 'sr-RS', 'sr-RS@latin', 'sv-SE', 'ta-IN', 'te-IN', 'tr-TR', 'uk-UA', 'vi-VN'];
 for (var _i4 = 0; _i4 < dotDecimal.length; _i4++) {
   decimal[dotDecimal[_i4]] = decimal['en-US'];
 }
-
 for (var _i5 = 0; _i5 < commaDecimal.length; _i5++) {
   decimal[commaDecimal[_i5]] = ',';
 }
-
 alpha['fr-CA'] = alpha['fr-FR'];
 alphanumeric['fr-CA'] = alphanumeric['fr-FR'];
 alpha['pt-BR'] = alpha['pt-PT'];
 alphanumeric['pt-BR'] = alphanumeric['pt-PT'];
-decimal['pt-BR'] = decimal['pt-PT']; // see #862
+decimal['pt-BR'] = decimal['pt-PT'];
 
+// see #862
 alpha['pl-Pl'] = alpha['pl-PL'];
 alphanumeric['pl-Pl'] = alphanumeric['pl-PL'];
-decimal['pl-Pl'] = decimal['pl-PL']; // see #1455
+decimal['pl-Pl'] = decimal['pl-PL'];
 
+// see #1455
 alpha['fa-AF'] = alpha.fa;
 
 /***/ }),
@@ -28844,16 +29658,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = blacklist;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function blacklist(str, chars) {
   (0, _assertString.default)(str);
   return str.replace(new RegExp("[".concat(chars, "]+"), 'g'), '');
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28869,31 +29679,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = contains;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _toString = _interopRequireDefault(__nccwpck_require__(6451));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var defaulContainsOptions = {
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var defaultContainsOptions = {
   ignoreCase: false,
   minOccurrences: 1
 };
-
 function contains(str, elem, options) {
   (0, _assertString.default)(str);
-  options = (0, _merge.default)(options, defaulContainsOptions);
-
+  options = (0, _merge.default)(options, defaultContainsOptions);
   if (options.ignoreCase) {
     return str.toLowerCase().split((0, _toString.default)(elem).toLowerCase()).length > options.minOccurrences;
   }
-
   return str.split((0, _toString.default)(elem)).length > options.minOccurrences;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28909,16 +29710,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = equals;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function equals(str, comparison) {
   (0, _assertString.default)(str);
   return str === comparison;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28934,16 +29731,42 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = escape;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function escape(str) {
   (0, _assertString.default)(str);
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\//g, '&#x2F;').replace(/\\/g, '&#x5C;').replace(/`/g, '&#96;');
 }
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
+/***/ }),
+
+/***/ 9639:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = isAbaRouting;
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+// http://www.brainjar.com/js/validation/
+// https://www.aba.com/news-research/research-analysis/routing-number-policy-procedures
+// series reserved for future use are excluded
+var isRoutingReg = /^(?!(1[3-9])|(20)|(3[3-9])|(4[0-9])|(5[0-9])|(60)|(7[3-9])|(8[1-9])|(9[0-2])|(9[3-9]))[0-9]{9}$/;
+function isAbaRouting(str) {
+  (0, _assertString.default)(str);
+  if (!isRoutingReg.test(str)) return false;
+  var checkSumVal = 0;
+  for (var i = 0; i < str.length; i++) {
+    if (i % 3 === 0) checkSumVal += str[i] * 3;else if (i % 3 === 1) checkSumVal += str[i] * 7;else checkSumVal += str[i] * 1;
+  }
+  return checkSumVal % 10 === 0;
+}
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28959,20 +29782,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isAfter;
-
 var _toDate = _interopRequireDefault(__nccwpck_require__(3834));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function isAfter(date, options) {
   // For backwards compatibility:
   // isAfter(str [, date]), i.e. `options` could be used as argument for the legacy `date`
-  var comparisonDate = (options === null || options === void 0 ? void 0 : options.comparisonDate) || options || Date().toString();
+  var comparisonDate = (_typeof(options) === 'object' ? options.comparisonDate : options) || Date().toString();
   var comparison = (0, _toDate.default)(comparisonDate);
   var original = (0, _toDate.default)(date);
   return !!(original && comparison && original > comparison);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -28989,20 +29809,15 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isAlpha;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _alpha = __nccwpck_require__(2644);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isAlpha(_str) {
   var locale = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'en-US';
   var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   (0, _assertString.default)(_str);
   var str = _str;
   var ignore = options.ignore;
-
   if (ignore) {
     if (ignore instanceof RegExp) {
       str = str.replace(ignore, '');
@@ -29012,16 +29827,12 @@ function isAlpha(_str) {
       throw new Error('ignore should be instance of a String or RegExp');
     }
   }
-
   if (locale in _alpha.alpha) {
     return _alpha.alpha[locale].test(str);
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
-var locales = Object.keys(_alpha.alpha);
-exports.locales = locales;
+var locales = exports.locales = Object.keys(_alpha.alpha);
 
 /***/ }),
 
@@ -29036,20 +29847,15 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isAlphanumeric;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _alpha = __nccwpck_require__(2644);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isAlphanumeric(_str) {
   var locale = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'en-US';
   var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   (0, _assertString.default)(_str);
   var str = _str;
   var ignore = options.ignore;
-
   if (ignore) {
     if (ignore instanceof RegExp) {
       str = str.replace(ignore, '');
@@ -29059,16 +29865,12 @@ function isAlphanumeric(_str) {
       throw new Error('ignore should be instance of a String or RegExp');
     }
   }
-
   if (locale in _alpha.alphanumeric) {
     return _alpha.alphanumeric[locale].test(str);
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
-var locales = Object.keys(_alpha.alphanumeric);
-exports.locales = locales;
+var locales = exports.locales = Object.keys(_alpha.alphanumeric);
 
 /***/ }),
 
@@ -29082,11 +29884,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isAscii;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /* eslint-disable no-control-regex */
 var ascii = /^[\x00-\x7F]+$/;
 /* eslint-enable no-control-regex */
@@ -29095,7 +29894,6 @@ function isAscii(str) {
   (0, _assertString.default)(str);
   return ascii.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29111,29 +29909,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBIC;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isISO31661Alpha = __nccwpck_require__(3442);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // https://en.wikipedia.org/wiki/ISO_9362
 var isBICReg = /^[A-Za-z]{6}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$/;
-
 function isBIC(str) {
-  (0, _assertString.default)(str); // toUpperCase() should be removed when a new major version goes out that changes
+  (0, _assertString.default)(str);
+
+  // toUpperCase() should be removed when a new major version goes out that changes
   // the regex to [A-Z] (per the spec).
-
   var countryCode = str.slice(4, 6).toUpperCase();
-
   if (!_isISO31661Alpha.CountryCodes.has(countryCode) && countryCode !== 'XK') {
     return false;
   }
-
   return isBICReg.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29149,36 +29940,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBase32;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var base32 = /^[A-Z2-7]+=*$/;
 var crockfordBase32 = /^[A-HJKMNP-TV-Z0-9]+$/;
 var defaultBase32Options = {
   crockford: false
 };
-
 function isBase32(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, defaultBase32Options);
-
   if (options.crockford) {
     return crockfordBase32.test(str);
   }
-
-  var len = str.length;
-
-  if (len % 8 === 0 && base32.test(str)) {
-    return true;
-  }
-
-  return false;
+  return str.length % 8 === 0 && base32.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29194,24 +29971,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBase58;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // Accepted chars - 123456789ABCDEFGH JKLMN PQRSTUVWXYZabcdefghijk mnopqrstuvwxyz
 var base58Reg = /^[A-HJ-NP-Za-km-z1-9]*$/;
-
 function isBase58(str) {
   (0, _assertString.default)(str);
-
-  if (base58Reg.test(str)) {
-    return true;
-  }
-
-  return false;
+  return base58Reg.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29227,36 +29994,30 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBase64;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var notBase64 = /[^A-Z0-9+\/=]/i;
-var urlSafeBase64 = /^[A-Z0-9_\-]*$/i;
-var defaultBase64Options = {
-  urlSafe: false
-};
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var base64WithPadding = /^[A-Za-z0-9+/]+={0,2}$/;
+var base64WithoutPadding = /^[A-Za-z0-9+/]+$/;
+var base64UrlWithPadding = /^[A-Za-z0-9_-]+={0,2}$/;
+var base64UrlWithoutPadding = /^[A-Za-z0-9_-]+$/;
 function isBase64(str, options) {
+  var _options;
   (0, _assertString.default)(str);
-  options = (0, _merge.default)(options, defaultBase64Options);
-  var len = str.length;
-
+  options = (0, _merge.default)(options, {
+    urlSafe: false,
+    padding: !((_options = options) !== null && _options !== void 0 && _options.urlSafe)
+  });
+  if (str === '') return true;
+  if (options.padding && str.length % 4 !== 0) return false;
+  var regex;
   if (options.urlSafe) {
-    return urlSafeBase64.test(str);
+    regex = options.padding ? base64UrlWithPadding : base64UrlWithoutPadding;
+  } else {
+    regex = options.padding ? base64WithPadding : base64WithoutPadding;
   }
-
-  if (len % 4 !== 0 || notBase64.test(str)) {
-    return false;
-  }
-
-  var firstPaddingChar = str.indexOf('=');
-  return firstPaddingChar === -1 || firstPaddingChar === len - 1 || firstPaddingChar === len - 2 && str[len - 1] === '=';
+  return (!options.padding || str.length % 4 === 0) && regex.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29272,21 +30033,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBefore;
-
-var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _toDate = _interopRequireDefault(__nccwpck_require__(3834));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function isBefore(str) {
-  var date = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : String(new Date());
-  (0, _assertString.default)(str);
-  var comparison = (0, _toDate.default)(date);
-  var original = (0, _toDate.default)(str);
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function isBefore(date, options) {
+  // For backwards compatibility:
+  // isBefore(str [, date]), i.e. `options` could be used as argument for the legacy `date`
+  var comparisonDate = (_typeof(options) === 'object' ? options.comparisonDate : options) || Date().toString();
+  var comparison = (0, _toDate.default)(comparisonDate);
+  var original = (0, _toDate.default)(date);
   return !!(original && comparison && original < comparison);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29302,28 +30059,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBoolean;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _includesArray = _interopRequireDefault(__nccwpck_require__(2776));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var defaultOptions = {
   loose: false
 };
 var strictBooleans = ['true', 'false', '1', '0'];
 var looseBooleans = [].concat(strictBooleans, ['yes', 'no']);
-
 function isBoolean(str) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : defaultOptions;
   (0, _assertString.default)(str);
-
   if (options.loose) {
-    return looseBooleans.includes(str.toLowerCase());
+    return (0, _includesArray.default)(looseBooleans, str.toLowerCase());
   }
-
-  return strictBooleans.includes(str);
+  return (0, _includesArray.default)(strictBooleans, str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29339,19 +30090,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isBtcAddress;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var bech32 = /^(bc1)[a-z0-9]{25,39}$/;
-var base58 = /^(1|3)[A-HJ-NP-Za-km-z1-9]{25,39}$/;
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var bech32 = /^(bc1|tb1|bc1p|tb1p)[ac-hj-np-z02-9]{39,58}$/;
+var base58 = /^(1|2|3|m)[A-HJ-NP-Za-km-z1-9]{25,39}$/;
 function isBtcAddress(str) {
   (0, _assertString.default)(str);
   return bech32.test(str) || base58.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29367,19 +30113,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isByteLength;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 /* eslint-disable prefer-rest-params */
 function isByteLength(str, options) {
   (0, _assertString.default)(str);
   var min;
   var max;
-
   if (_typeof(options) === 'object') {
     min = options.min || 0;
     max = options.max;
@@ -29388,11 +30129,9 @@ function isByteLength(str, options) {
     min = arguments[1];
     max = arguments[2];
   }
-
   var len = encodeURI(str).split(/%..|./).length - 1;
   return len >= min && (typeof max === 'undefined' || len <= max);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29408,13 +30147,9 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isCreditCard;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isLuhnNumber = _interopRequireDefault(__nccwpck_require__(5912));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var cards = {
   amex: /^3[47][0-9]{13}$/,
   dinersclub: /^3(?:0[0-5]|[68][0-9])[0-9]{11}$/,
@@ -29425,17 +30160,21 @@ var cards = {
   unionpay: /^(6[27][0-9]{14}|^(81[0-9]{14,17}))$/,
   visa: /^(?:4[0-9]{12})(?:[0-9]{3,6})?$/
 };
-/* eslint-disable max-len */
-
-var allCards = /^(?:4[0-9]{12}(?:[0-9]{3,6})?|5[1-5][0-9]{14}|(222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|6(?:011|5[0-9][0-9])[0-9]{12,15}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\d{3})\d{11}|6[27][0-9]{14}|^(81[0-9]{14,17}))$/;
-/* eslint-enable max-len */
-
+var allCards = function () {
+  var tmpCardsArray = [];
+  for (var cardProvider in cards) {
+    // istanbul ignore else
+    if (cards.hasOwnProperty(cardProvider)) {
+      tmpCardsArray.push(cards[cardProvider]);
+    }
+  }
+  return tmpCardsArray;
+}();
 function isCreditCard(card) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(card);
   var provider = options.provider;
   var sanitized = card.replace(/[- ]+/g, '');
-
   if (provider && provider.toLowerCase() in cards) {
     // specific provider in the list
     if (!cards[provider.toLowerCase()].test(sanitized)) {
@@ -29444,14 +30183,14 @@ function isCreditCard(card) {
   } else if (provider && !(provider.toLowerCase() in cards)) {
     /* specific provider not in the list */
     throw new Error("".concat(provider, " is not a valid credit card provider."));
-  } else if (!allCards.test(sanitized)) {
+  } else if (!allCards.some(function (cardProvider) {
+    return cardProvider.test(sanitized);
+  })) {
     // no specific provider
     return false;
   }
-
   return (0, _isLuhnNumber.default)(card);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29467,38 +30206,35 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isCurrency;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function currencyRegex(options) {
   var decimal_digits = "\\d{".concat(options.digits_after_decimal[0], "}");
   options.digits_after_decimal.forEach(function (digit, index) {
     if (index !== 0) decimal_digits = "".concat(decimal_digits, "|\\d{").concat(digit, "}");
   });
   var symbol = "(".concat(options.symbol.replace(/\W/, function (m) {
-    return "\\".concat(m);
-  }), ")").concat(options.require_symbol ? '' : '?'),
-      negative = '-?',
-      whole_dollar_amount_without_sep = '[1-9]\\d*',
-      whole_dollar_amount_with_sep = "[1-9]\\d{0,2}(\\".concat(options.thousands_separator, "\\d{3})*"),
-      valid_whole_dollar_amounts = ['0', whole_dollar_amount_without_sep, whole_dollar_amount_with_sep],
-      whole_dollar_amount = "(".concat(valid_whole_dollar_amounts.join('|'), ")?"),
-      decimal_amount = "(\\".concat(options.decimal_separator, "(").concat(decimal_digits, "))").concat(options.require_decimal ? '' : '?');
-  var pattern = whole_dollar_amount + (options.allow_decimal || options.require_decimal ? decimal_amount : ''); // default is negative sign before symbol, but there are two other options (besides parens)
+      return "\\".concat(m);
+    }), ")").concat(options.require_symbol ? '' : '?'),
+    negative = '-?',
+    whole_dollar_amount_without_sep = '[1-9]\\d*',
+    whole_dollar_amount_with_sep = "[1-9]\\d{0,2}(\\".concat(options.thousands_separator, "\\d{3})*"),
+    valid_whole_dollar_amounts = ['0', whole_dollar_amount_without_sep, whole_dollar_amount_with_sep],
+    whole_dollar_amount = "(".concat(valid_whole_dollar_amounts.join('|'), ")?"),
+    decimal_amount = "(\\".concat(options.decimal_separator, "(").concat(decimal_digits, "))").concat(options.require_decimal ? '' : '?');
+  var pattern = whole_dollar_amount + (options.allow_decimal || options.require_decimal ? decimal_amount : '');
 
+  // default is negative sign before symbol, but there are two other options (besides parens)
   if (options.allow_negatives && !options.parens_for_negatives) {
     if (options.negative_sign_after_digits) {
       pattern += negative;
     } else if (options.negative_sign_before_digits) {
       pattern = negative + pattern;
     }
-  } // South African Rand, for example, uses R 123 (space) and R-123 (no space)
+  }
 
-
+  // South African Rand, for example, uses R 123 (space) and R-123 (no space)
   if (options.allow_negative_sign_placeholder) {
     pattern = "( (?!\\-))?".concat(pattern);
   } else if (options.allow_space_after_symbol) {
@@ -29506,26 +30242,23 @@ function currencyRegex(options) {
   } else if (options.allow_space_after_digits) {
     pattern += '( (?!$))?';
   }
-
   if (options.symbol_after_digits) {
     pattern += symbol;
   } else {
     pattern = symbol + pattern;
   }
-
   if (options.allow_negatives) {
     if (options.parens_for_negatives) {
       pattern = "(\\(".concat(pattern, "\\)|").concat(pattern, ")");
     } else if (!(options.negative_sign_before_digits || options.negative_sign_after_digits)) {
       pattern = negative + pattern;
     }
-  } // ensure there's a dollar and/or decimal amount, and that
+  }
+
+  // ensure there's a dollar and/or decimal amount, and that
   // it doesn't start with a space or a negative sign followed by a space
-
-
   return new RegExp("^(?!-? )(?=.*\\d)".concat(pattern, "$"));
 }
-
 var default_currency_options = {
   symbol: '$',
   require_symbol: false,
@@ -29543,13 +30276,11 @@ var default_currency_options = {
   digits_after_decimal: [2],
   allow_space_after_digits: false
 };
-
 function isCurrency(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, default_currency_options);
   return currencyRegex(options).test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29565,51 +30296,38 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isDataURI;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var validMediaType = /^[a-z]+\/[a-z0-9\-\+\._]+$/i;
 var validAttribute = /^[a-z\-]+=[a-z0-9\-]+$/i;
 var validData = /^[a-z0-9!\$&'\(\)\*\+,;=\-\._~:@\/\?%\s]*$/i;
-
 function isDataURI(str) {
   (0, _assertString.default)(str);
   var data = str.split(',');
-
   if (data.length < 2) {
     return false;
   }
-
   var attributes = data.shift().trim().split(';');
   var schemeAndMediaType = attributes.shift();
-
   if (schemeAndMediaType.slice(0, 5) !== 'data:') {
     return false;
   }
-
   var mediaType = schemeAndMediaType.slice(5);
-
   if (mediaType !== '' && !validMediaType.test(mediaType)) {
     return false;
   }
-
   for (var i = 0; i < attributes.length; i++) {
     if (!(i === attributes.length - 1 && attributes[i].toLowerCase() === 'base64') && !validAttribute.test(attributes[i])) {
       return false;
     }
   }
-
   for (var _i = 0; _i < data.length; _i++) {
     if (!validData.test(data[_i])) {
       return false;
     }
   }
-
   return true;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29625,57 +30343,42 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isDate;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-
-function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-
-function _createForOfIteratorHelper(o, allowArrayLike) { var it; if (typeof Symbol === "undefined" || o[Symbol.iterator] == null) { if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") { if (it) o = it; var i = 0; var F = function F() {}; return { s: F, n: function n() { if (i >= o.length) return { done: true }; return { done: false, value: o[i++] }; }, e: function e(_e2) { throw _e2; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var normalCompletion = true, didErr = false, err; return { s: function s() { it = o[Symbol.iterator](); }, n: function n() { var step = it.next(); normalCompletion = step.done; return step; }, e: function e(_e3) { didErr = true; err = _e3; }, f: function f() { try { if (!normalCompletion && it.return != null) it.return(); } finally { if (didErr) throw err; } } }; }
-
-function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 var default_date_options = {
   format: 'YYYY/MM/DD',
   delimiters: ['/', '-'],
   strictMode: false
 };
-
 function isValidFormat(format) {
   return /(^(y{4}|y{2})[.\/-](m{1,2})[.\/-](d{1,2})$)|(^(m{1,2})[.\/-](d{1,2})[.\/-]((y{4}|y{2})$))|(^(d{1,2})[.\/-](m{1,2})[.\/-]((y{4}|y{2})$))/gi.test(format);
 }
-
 function zip(date, format) {
   var zippedArr = [],
-      len = Math.min(date.length, format.length);
-
+    len = Math.max(date.length, format.length);
   for (var i = 0; i < len; i++) {
     zippedArr.push([date[i], format[i]]);
   }
-
   return zippedArr;
 }
-
 function isDate(input, options) {
   if (typeof options === 'string') {
-    // Allow backward compatbility for old format isDate(input [, format])
+    // Allow backward compatibility for old format isDate(input [, format])
     options = (0, _merge.default)({
       format: options
     }, default_date_options);
   } else {
     options = (0, _merge.default)(options, default_date_options);
   }
-
   if (typeof input === 'string' && isValidFormat(options.format)) {
+    if (options.strictMode && input.length !== options.format.length) return false;
     var formatDelimiter = options.delimiters.find(function (delimiter) {
       return options.format.indexOf(delimiter) !== -1;
     });
@@ -29684,20 +30387,16 @@ function isDate(input, options) {
     });
     var dateAndFormat = zip(input.split(dateDelimiter), options.format.toLowerCase().split(formatDelimiter));
     var dateObj = {};
-
     var _iterator = _createForOfIteratorHelper(dateAndFormat),
-        _step;
-
+      _step;
     try {
       for (_iterator.s(); !(_step = _iterator.n()).done;) {
         var _step$value = _slicedToArray(_step.value, 2),
-            dateWord = _step$value[0],
-            formatWord = _step$value[1];
-
-        if (dateWord.length !== formatWord.length) {
+          dateWord = _step$value[0],
+          formatWord = _step$value[1];
+        if (!dateWord || !formatWord || dateWord.length !== formatWord.length) {
           return false;
         }
-
         dateObj[formatWord.charAt(0)] = dateWord;
       }
     } catch (err) {
@@ -29705,17 +30404,39 @@ function isDate(input, options) {
     } finally {
       _iterator.f();
     }
+    var fullYear = dateObj.y;
 
-    return new Date("".concat(dateObj.m, "/").concat(dateObj.d, "/").concat(dateObj.y)).getDate() === +dateObj.d;
+    // Check if the year starts with a hyphen
+    if (fullYear.startsWith('-')) {
+      return false; // Hyphen before year is not allowed
+    }
+    if (dateObj.y.length === 2) {
+      var parsedYear = parseInt(dateObj.y, 10);
+      if (isNaN(parsedYear)) {
+        return false;
+      }
+      var currentYearLastTwoDigits = new Date().getFullYear() % 100;
+      if (parsedYear < currentYearLastTwoDigits) {
+        fullYear = "20".concat(dateObj.y);
+      } else {
+        fullYear = "19".concat(dateObj.y);
+      }
+    }
+    var month = dateObj.m;
+    if (dateObj.m.length === 1) {
+      month = "0".concat(dateObj.m);
+    }
+    var day = dateObj.d;
+    if (dateObj.d.length === 1) {
+      day = "0".concat(dateObj.d);
+    }
+    return new Date("".concat(fullYear, "-").concat(month, "-").concat(day, "T00:00:00.000Z")).getUTCDate() === +dateObj.d;
   }
-
   if (!options.strictMode) {
     return Object.prototype.toString.call(input) === '[object Date]' && isFinite(input);
   }
-
   return false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29731,40 +30452,29 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isDecimal;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-var _includes = _interopRequireDefault(__nccwpck_require__(5484));
-
+var _includesArray = _interopRequireDefault(__nccwpck_require__(2776));
 var _alpha = __nccwpck_require__(2644);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function decimalRegExp(options) {
   var regExp = new RegExp("^[-+]?([0-9]+)?(\\".concat(_alpha.decimal[options.locale], "[0-9]{").concat(options.decimal_digits, "})").concat(options.force_decimal ? '' : '?', "$"));
   return regExp;
 }
-
 var default_decimal_options = {
   force_decimal: false,
   decimal_digits: '1,',
   locale: 'en-US'
 };
 var blacklist = ['', '-', '+'];
-
 function isDecimal(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, default_decimal_options);
-
   if (options.locale in _alpha.decimal) {
-    return !(0, _includes.default)(blacklist, str.replace(/ /g, '')) && decimalRegExp(options).test(str);
+    return !(0, _includesArray.default)(blacklist, str.replace(/ /g, '')) && decimalRegExp(options).test(str);
   }
-
   throw new Error("Invalid locale '".concat(options.locale, "'"));
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29780,18 +30490,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isDivisibleBy;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _toFloat = _interopRequireDefault(__nccwpck_require__(2429));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isDivisibleBy(str, num) {
   (0, _assertString.default)(str);
   return (0, _toFloat.default)(str) % parseInt(num, 10) === 0;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29807,11 +30512,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isEAN;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /**
  * The most commonly used EAN standard is
  * the thirteen-digit EAN-13, while the
@@ -29827,13 +30529,14 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  */
 
 /**
- * Define EAN Lenghts; 8 for EAN-8; 13 for EAN-13; 14 for EAN-14
+ * Define EAN Lengths; 8 for EAN-8; 13 for EAN-13; 14 for EAN-14
  * and Regular Expression for valid EANs (EAN-8, EAN-13, EAN-14),
- * with exact numberic matching of 8 or 13 or 14 digits [0-9]
+ * with exact numeric matching of 8 or 13 or 14 digits [0-9]
  */
 var LENGTH_EAN_8 = 8;
 var LENGTH_EAN_14 = 14;
 var validEanRegex = /^(\d{8}|\d{13}|\d{14})$/;
+
 /**
  * Get position weight given:
  * EAN length and digit index/position
@@ -29842,14 +30545,13 @@ var validEanRegex = /^(\d{8}|\d{13}|\d{14})$/;
  * @param {number} index
  * @return {number}
  */
-
 function getPositionWeightThroughLengthAndIndex(length, index) {
   if (length === LENGTH_EAN_8 || length === LENGTH_EAN_14) {
     return index % 2 === 0 ? 3 : 1;
   }
-
   return index % 2 === 0 ? 1 : 3;
 }
+
 /**
  * Calculate EAN Check Digit
  * Reference: https://en.wikipedia.org/wiki/International_Article_Number#Calculation_of_checksum_digit
@@ -29857,8 +30559,6 @@ function getPositionWeightThroughLengthAndIndex(length, index) {
  * @param {string} ean
  * @return {number}
  */
-
-
 function calculateCheckDigit(ean) {
   var checksum = ean.slice(0, -1).split('').map(function (char, index) {
     return Number(char) * getPositionWeightThroughLengthAndIndex(ean.length, index);
@@ -29868,6 +30568,7 @@ function calculateCheckDigit(ean) {
   var remainder = 10 - checksum % 10;
   return remainder < 10 ? remainder : 0;
 }
+
 /**
  * Check if string is valid EAN:
  * Matches EAN-8/EAN-13/EAN-14 regex
@@ -29876,14 +30577,11 @@ function calculateCheckDigit(ean) {
  * @param {string} str
  * @return {boolean}
  */
-
-
 function isEAN(str) {
   (0, _assertString.default)(str);
   var actualCheckDigit = Number(str.slice(-1));
   return validEanRegex.test(str) && actualCheckDigit === calculateCheckDigit(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -29899,21 +30597,16 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isEmail;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
+var _checkHost = _interopRequireDefault(__nccwpck_require__(261));
 var _isByteLength = _interopRequireDefault(__nccwpck_require__(3189));
-
 var _isFQDN = _interopRequireDefault(__nccwpck_require__(5627));
-
 var _isIP = _interopRequireDefault(__nccwpck_require__(8253));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _merge = _interopRequireDefault(__nccwpck_require__(9956));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var default_email_options = {
   allow_display_name: false,
+  allow_underscores: false,
   require_display_name: false,
   allow_utf8_local_part: true,
   require_tld: true,
@@ -29922,74 +30615,66 @@ var default_email_options = {
   host_blacklist: [],
   host_whitelist: []
 };
+
 /* eslint-disable max-len */
-
 /* eslint-disable no-control-regex */
-
 var splitNameAddress = /^([^\x00-\x1F\x7F-\x9F\cX]+)</i;
 var emailUserPart = /^[a-z\d!#\$%&'\*\+\-\/=\?\^_`{\|}~]+$/i;
 var gmailUserPart = /^[a-z\d]+$/;
 var quotedEmailUser = /^([\s\x01-\x08\x0b\x0c\x0e-\x1f\x7f\x21\x23-\x5b\x5d-\x7e]|(\\[\x01-\x09\x0b\x0c\x0d-\x7f]))*$/i;
-var emailUserUtf8Part = /^[a-z\d!#\$%&'\*\+\-\/=\?\^_`{\|}~\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+$/i;
+var emailUserUtf8Part = /^[a-z\d!#\$%&'\*\+\-\/=\?\^_`{\|}~\u00A1-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+$/i;
 var quotedEmailUserUtf8 = /^([\s\x01-\x08\x0b\x0c\x0e-\x1f\x7f\x21\x23-\x5b\x5d-\x7e\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]|(\\[\x01-\x09\x0b\x0c\x0d-\x7f\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]))*$/i;
 var defaultMaxEmailLength = 254;
 /* eslint-enable max-len */
-
 /* eslint-enable no-control-regex */
 
 /**
  * Validate display name according to the RFC2822: https://tools.ietf.org/html/rfc2822#appendix-A.1.2
  * @param {String} display_name
  */
-
 function validateDisplayName(display_name) {
-  var display_name_without_quotes = display_name.replace(/^"(.+)"$/, '$1'); // display name with only spaces is not valid
-
+  var display_name_without_quotes = display_name.replace(/^"(.+)"$/, '$1');
+  // display name with only spaces is not valid
   if (!display_name_without_quotes.trim()) {
     return false;
-  } // check whether display name contains illegal character
+  }
 
-
+  // check whether display name contains illegal character
   var contains_illegal = /[\.";<>]/.test(display_name_without_quotes);
-
   if (contains_illegal) {
     // if contains illegal characters,
     // must to be enclosed in double-quotes, otherwise it's not a valid display name
     if (display_name_without_quotes === display_name) {
       return false;
-    } // the quotes in display name must start with character symbol \
+    }
 
-
+    // the quotes in display name must start with character symbol \
     var all_start_with_back_slash = display_name_without_quotes.split('"').length === display_name_without_quotes.split('\\"').length;
-
     if (!all_start_with_back_slash) {
       return false;
     }
   }
-
   return true;
 }
-
 function isEmail(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, default_email_options);
-
   if (options.require_display_name || options.allow_display_name) {
     var display_email = str.match(splitNameAddress);
-
     if (display_email) {
-      var display_name = display_email[1]; // Remove display name and angle brackets to get email address
-      // Can be done in the regex but will introduce a ReDOS (See  #1597 for more info)
+      var display_name = display_email[1];
 
-      str = str.replace(display_name, '').replace(/(^<|>$)/g, ''); // sometimes need to trim the last space to get the display name
+      // Remove display name and angle brackets to get email address
+      // Can be done in the regex but will introduce a ReDOS (See  #1597 for more info)
+      str = str.replace(display_name, '').replace(/(^<|>$)/g, '');
+
+      // sometimes need to trim the last space to get the display name
       // because there may be a space between display name and email address
       // eg. myname <address@gmail.com>
       // the display name is `myname` instead of `myname `, so need to trim the last space
-
       if (display_name.endsWith(' ')) {
         display_name = display_name.slice(0, -1);
       }
-
       if (!validateDisplayName(display_name)) {
         return false;
       }
@@ -29997,53 +30682,46 @@ function isEmail(str, options) {
       return false;
     }
   }
-
   if (!options.ignore_max_length && str.length > defaultMaxEmailLength) {
     return false;
   }
-
   var parts = str.split('@');
   var domain = parts.pop();
   var lower_domain = domain.toLowerCase();
-
-  if (options.host_blacklist.includes(lower_domain)) {
+  if (options.host_blacklist.length > 0 && (0, _checkHost.default)(lower_domain, options.host_blacklist)) {
     return false;
   }
-
-  if (options.host_whitelist.length > 0 && !options.host_whitelist.includes(lower_domain)) {
+  if (options.host_whitelist.length > 0 && !(0, _checkHost.default)(lower_domain, options.host_whitelist)) {
     return false;
   }
-
   var user = parts.join('@');
-
   if (options.domain_specific_validation && (lower_domain === 'gmail.com' || lower_domain === 'googlemail.com')) {
     /*
-      Previously we removed dots for gmail addresses before validating.
-      This was removed because it allows `multiple..dots@gmail.com`
-      to be reported as valid, but it is not.
-      Gmail only normalizes single dots, removing them from here is pointless,
-      should be done in normalizeEmail
+    Previously we removed dots for gmail addresses before validating.
+    This was removed because it allows `multiple..dots@gmail.com`
+    to be reported as valid, but it is not.
+    Gmail only normalizes single dots, removing them from here is pointless,
+    should be done in normalizeEmail
     */
-    user = user.toLowerCase(); // Removing sub-address from username before gmail validation
+    user = user.toLowerCase();
 
-    var username = user.split('+')[0]; // Dots are not included in gmail length restriction
+    // Removing sub-address from username before gmail validation
+    var username = user.split('+')[0];
 
+    // Dots are not included in gmail length restriction
     if (!(0, _isByteLength.default)(username.replace(/\./g, ''), {
       min: 6,
       max: 30
     })) {
       return false;
     }
-
     var _user_parts = username.split('.');
-
     for (var i = 0; i < _user_parts.length; i++) {
       if (!gmailUserPart.test(_user_parts[i])) {
         return false;
       }
     }
   }
-
   if (options.ignore_max_length === false && (!(0, _isByteLength.default)(user, {
     max: 64
   }) || !(0, _isByteLength.default)(domain, {
@@ -30051,49 +30729,40 @@ function isEmail(str, options) {
   }))) {
     return false;
   }
-
   if (!(0, _isFQDN.default)(domain, {
     require_tld: options.require_tld,
-    ignore_max_length: options.ignore_max_length
+    ignore_max_length: options.ignore_max_length,
+    allow_underscores: options.allow_underscores
   })) {
     if (!options.allow_ip_domain) {
       return false;
     }
-
     if (!(0, _isIP.default)(domain)) {
       if (!domain.startsWith('[') || !domain.endsWith(']')) {
         return false;
       }
-
       var noBracketdomain = domain.slice(1, -1);
-
       if (noBracketdomain.length === 0 || !(0, _isIP.default)(noBracketdomain)) {
         return false;
       }
     }
   }
-
-  if (user[0] === '"') {
+  if (options.blacklisted_chars) {
+    if (user.search(new RegExp("[".concat(options.blacklisted_chars, "]+"), 'g')) !== -1) return false;
+  }
+  if (user[0] === '"' && user[user.length - 1] === '"') {
     user = user.slice(1, user.length - 1);
     return options.allow_utf8_local_part ? quotedEmailUserUtf8.test(user) : quotedEmailUser.test(user);
   }
-
   var pattern = options.allow_utf8_local_part ? emailUserUtf8Part : emailUserPart;
   var user_parts = user.split('.');
-
   for (var _i = 0; _i < user_parts.length; _i++) {
     if (!pattern.test(user_parts[_i])) {
       return false;
     }
   }
-
-  if (options.blacklisted_chars) {
-    if (user.search(new RegExp("[".concat(options.blacklisted_chars, "]+"), 'g')) !== -1) return false;
-  }
-
   return true;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30109,23 +30778,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isEmpty;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var default_is_empty_options = {
   ignore_whitespace: false
 };
-
 function isEmpty(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, default_is_empty_options);
   return (options.ignore_whitespace ? str.trim().length : str.length) === 0;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30141,18 +30804,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isEthereumAddress;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var eth = /^(0x)[0-9a-f]{40}$/i;
-
 function isEthereumAddress(str) {
   (0, _assertString.default)(str);
   return eth.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30168,13 +30826,9 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isFQDN;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var default_fqdn_options = {
   require_tld: true,
   allow_underscores: false,
@@ -30183,73 +30837,63 @@ var default_fqdn_options = {
   allow_wildcard: false,
   ignore_max_length: false
 };
-
 function isFQDN(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, default_fqdn_options);
-  /* Remove the optional trailing dot before checking validity */
 
+  /* Remove the optional trailing dot before checking validity */
   if (options.allow_trailing_dot && str[str.length - 1] === '.') {
     str = str.substring(0, str.length - 1);
   }
+
   /* Remove the optional wildcard before checking validity */
-
-
   if (options.allow_wildcard === true && str.indexOf('*.') === 0) {
     str = str.substring(2);
   }
-
   var parts = str.split('.');
   var tld = parts[parts.length - 1];
-
   if (options.require_tld) {
     // disallow fqdns without tld
     if (parts.length < 2) {
       return false;
     }
-
     if (!options.allow_numeric_tld && !/^([a-z\u00A1-\u00A8\u00AA-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]{2,}|xn[a-z0-9-]{2,})$/i.test(tld)) {
       return false;
-    } // disallow spaces
+    }
 
-
+    // disallow spaces
     if (/\s/.test(tld)) {
       return false;
     }
-  } // reject numeric TLDs
+  }
 
-
+  // reject numeric TLDs
   if (!options.allow_numeric_tld && /^\d+$/.test(tld)) {
     return false;
   }
-
   return parts.every(function (part) {
     if (part.length > 63 && !options.ignore_max_length) {
       return false;
     }
-
     if (!/^[a-z_\u00a1-\uffff0-9-]+$/i.test(part)) {
       return false;
-    } // disallow full-width chars
+    }
 
-
+    // disallow full-width chars
     if (/[\uff01-\uff5e]/.test(part)) {
       return false;
-    } // disallow parts starting or ending with hyphen
+    }
 
-
+    // disallow parts starting or ending with hyphen
     if (/^-|-$/.test(part)) {
       return false;
     }
-
     if (!options.allow_underscores && /_/.test(part)) {
       return false;
     }
-
     return true;
   });
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30266,28 +30910,21 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isFloat;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
+var _nullUndefinedCheck = _interopRequireDefault(__nccwpck_require__(2404));
 var _alpha = __nccwpck_require__(2644);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isFloat(str, options) {
   (0, _assertString.default)(str);
   options = options || {};
   var float = new RegExp("^(?:[-+])?(?:[0-9]+)?(?:\\".concat(options.locale ? _alpha.decimal[options.locale] : '.', "[0-9]*)?(?:[eE][\\+\\-]?(?:[0-9]+))?$"));
-
   if (str === '' || str === '.' || str === ',' || str === '-' || str === '+') {
     return false;
   }
-
   var value = parseFloat(str.replace(',', '.'));
-  return float.test(str) && (!options.hasOwnProperty('min') || value >= options.min) && (!options.hasOwnProperty('max') || value <= options.max) && (!options.hasOwnProperty('lt') || value < options.lt) && (!options.hasOwnProperty('gt') || value > options.gt);
+  return float.test(str) && (!options.hasOwnProperty('min') || (0, _nullUndefinedCheck.default)(options.min) || value >= options.min) && (!options.hasOwnProperty('max') || (0, _nullUndefinedCheck.default)(options.max) || value <= options.max) && (!options.hasOwnProperty('lt') || (0, _nullUndefinedCheck.default)(options.lt) || value < options.lt) && (!options.hasOwnProperty('gt') || (0, _nullUndefinedCheck.default)(options.gt) || value > options.gt);
 }
-
-var locales = Object.keys(_alpha.decimal);
-exports.locales = locales;
+var locales = exports.locales = Object.keys(_alpha.decimal);
 
 /***/ }),
 
@@ -30302,14 +30939,9 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isFullWidth;
 exports.fullWidth = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var fullWidth = /[^\u0020-\u007E\uFF61-\uFF9F\uFFA0-\uFFDC\uFFE8-\uFFEE0-9a-zA-Z]/;
-exports.fullWidth = fullWidth;
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var fullWidth = exports.fullWidth = /[^\u0020-\u007E\uFF61-\uFF9F\uFFA0-\uFFDC\uFFE8-\uFFEE0-9a-zA-Z]/;
 function isFullWidth(str) {
   (0, _assertString.default)(str);
   return fullWidth.test(str);
@@ -30327,26 +30959,20 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isHSL;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var hslComma = /^hsla?\(((\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?))(deg|grad|rad|turn)?(,(\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?)%){2}(,((\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?)%?))?\)$/i;
 var hslSpace = /^hsla?\(((\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?))(deg|grad|rad|turn)?(\s(\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?)%){2}\s?(\/\s((\+|\-)?([0-9]+(\.[0-9]+)?(e(\+|\-)?[0-9]+)?|\.[0-9]+(e(\+|\-)?[0-9]+)?)%?)\s?)?\)$/i;
-
 function isHSL(str) {
-  (0, _assertString.default)(str); // Strip duplicate spaces before calling the validation regex (See  #1598 for more info)
+  (0, _assertString.default)(str);
 
+  // Strip duplicate spaces before calling the validation regex (See  #1598 for more info)
   var strippedStr = str.replace(/\s+/g, ' ').replace(/\s?(hsla?\(|\)|,)\s?/ig, '$1');
-
   if (strippedStr.indexOf(',') !== -1) {
     return hslComma.test(strippedStr);
   }
-
   return hslSpace.test(strippedStr);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30363,14 +30989,9 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isHalfWidth;
 exports.halfWidth = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var halfWidth = /[\u0020-\u007E\uFF61-\uFF9F\uFFA0-\uFFDC\uFFE8-\uFFEE0-9a-zA-Z]/;
-exports.halfWidth = halfWidth;
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var halfWidth = exports.halfWidth = /[\u0020-\u007E\uFF61-\uFF9F\uFFA0-\uFFDC\uFFE8-\uFFEE0-9a-zA-Z]/;
 function isHalfWidth(str) {
   (0, _assertString.default)(str);
   return halfWidth.test(str);
@@ -30388,11 +31009,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isHash;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var lengths = {
   md5: 32,
   md4: 32,
@@ -30408,13 +31026,11 @@ var lengths = {
   crc32: 8,
   crc32b: 8
 };
-
 function isHash(str, algorithm) {
   (0, _assertString.default)(str);
   var hash = new RegExp("^[a-fA-F0-9]{".concat(lengths[algorithm], "}$"));
   return hash.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30430,18 +31046,20 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isHexColor;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _merge = _interopRequireDefault(__nccwpck_require__(9956));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var hexcolor = /^#?([0-9A-F]{3}|[0-9A-F]{4}|[0-9A-F]{6}|[0-9A-F]{8})$/i;
-
-function isHexColor(str) {
+var hexcolor_with_prefix = /^#([0-9A-F]{3}|[0-9A-F]{4}|[0-9A-F]{6}|[0-9A-F]{8})$/i;
+var default_is_hexcolor_options = {
+  require_hashtag: false
+};
+function isHexColor(str, options) {
   (0, _assertString.default)(str);
-  return hexcolor.test(str);
+  options = (0, _merge.default)(options, default_is_hexcolor_options);
+  var hexcolor_regex = options.require_hashtag ? hexcolor_with_prefix : hexcolor;
+  return hexcolor_regex.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30457,18 +31075,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isHexadecimal;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var hexadecimal = /^(0x|0h)?[0-9A-F]+$/i;
-
 function isHexadecimal(str) {
   (0, _assertString.default)(str);
   return hexadecimal.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30485,11 +31098,9 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isIBAN;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _includesArray = _interopRequireDefault(__nccwpck_require__(2776));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /**
  * List of country codes with
  * corresponding IBAN regular expression
@@ -30514,6 +31125,7 @@ var ibanRegexThroughCountryCode = {
   DE: /^(DE[0-9]{2})\d{18}$/,
   DK: /^(DK[0-9]{2})\d{14}$/,
   DO: /^(DO[0-9]{2})[A-Z]{4}\d{20}$/,
+  DZ: /^(DZ\d{24})$/,
   EE: /^(EE[0-9]{2})\d{16}$/,
   EG: /^(EG[0-9]{2})\d{25}$/,
   ES: /^(ES[0-9]{2})\d{20}$/,
@@ -30528,10 +31140,10 @@ var ibanRegexThroughCountryCode = {
   GT: /^(GT[0-9]{2})[A-Z0-9]{4}[A-Z0-9]{20}$/,
   HR: /^(HR[0-9]{2})\d{17}$/,
   HU: /^(HU[0-9]{2})\d{24}$/,
-  IE: /^(IE[0-9]{2})[A-Z0-9]{4}\d{14}$/,
+  IE: /^(IE[0-9]{2})[A-Z]{4}\d{14}$/,
   IL: /^(IL[0-9]{2})\d{19}$/,
   IQ: /^(IQ[0-9]{2})[A-Z]{4}\d{15}$/,
-  IR: /^(IR[0-9]{2})0\d{2}0\d{18}$/,
+  IR: /^(IR[0-9]{2})\d{22}$/,
   IS: /^(IS[0-9]{2})\d{22}$/,
   IT: /^(IT[0-9]{2})[A-Z]{1}\d{10}[A-Z0-9]{12}$/,
   JO: /^(JO[0-9]{2})[A-Z]{4}\d{22}$/,
@@ -30543,6 +31155,7 @@ var ibanRegexThroughCountryCode = {
   LT: /^(LT[0-9]{2})\d{16}$/,
   LU: /^(LU[0-9]{2})\d{3}[A-Z0-9]{13}$/,
   LV: /^(LV[0-9]{2})[A-Z]{4}[A-Z0-9]{13}$/,
+  MA: /^(MA[0-9]{26})$/,
   MC: /^(MC[0-9]{2})\d{10}[A-Z0-9]{11}\d{2}$/,
   MD: /^(MD[0-9]{2})[A-Z0-9]{20}$/,
   ME: /^(ME[0-9]{2})\d{18}$/,
@@ -30555,7 +31168,7 @@ var ibanRegexThroughCountryCode = {
   NO: /^(NO[0-9]{2})\d{11}$/,
   PK: /^(PK[0-9]{2})[A-Z0-9]{4}\d{16}$/,
   PL: /^(PL[0-9]{2})\d{24}$/,
-  PS: /^(PS[0-9]{2})[A-Z0-9]{4}\d{21}$/,
+  PS: /^(PS[0-9]{2})[A-Z]{4}[A-Z0-9]{21}$/,
   PT: /^(PT[0-9]{2})\d{21}$/,
   QA: /^(QA[0-9]{2})[A-Z]{4}[A-Z0-9]{21}$/,
   RO: /^(RO[0-9]{2})[A-Z]{4}[A-Z0-9]{16}$/,
@@ -30572,9 +31185,25 @@ var ibanRegexThroughCountryCode = {
   TR: /^(TR[0-9]{2})\d{5}[A-Z0-9]{17}$/,
   UA: /^(UA[0-9]{2})\d{6}[A-Z0-9]{19}$/,
   VA: /^(VA[0-9]{2})\d{18}$/,
-  VG: /^(VG[0-9]{2})[A-Z0-9]{4}\d{16}$/,
+  VG: /^(VG[0-9]{2})[A-Z]{4}\d{16}$/,
   XK: /^(XK[0-9]{2})\d{16}$/
 };
+
+/**
+ * Check if the country codes passed are valid using the
+ * ibanRegexThroughCountryCode as a reference
+ *
+ * @param {array} countryCodeArray
+ * @return {boolean}
+ */
+
+function hasOnlyValidCountryCodes(countryCodeArray) {
+  var countryCodeArrayFilteredWithObjectIbanCode = countryCodeArray.filter(function (countryCode) {
+    return !(countryCode in ibanRegexThroughCountryCode);
+  });
+  return countryCodeArrayFilteredWithObjectIbanCode.length === 0;
+}
+
 /**
  * Check whether string has correct universal IBAN format
  * The IBAN consists of up to 34 alphanumeric characters, as follows:
@@ -30584,15 +31213,32 @@ var ibanRegexThroughCountryCode = {
  * NOTE: Permitted IBAN characters are: digits [0-9] and the 26 latin alphabetic [A-Z]
  *
  * @param {string} str - string under validation
+ * @param {object} options - object to pass the countries to be either whitelisted or blacklisted
  * @return {boolean}
  */
-
-function hasValidIbanFormat(str) {
+function hasValidIbanFormat(str, options) {
   // Strip white spaces and hyphens
   var strippedStr = str.replace(/[\s\-]+/gi, '').toUpperCase();
   var isoCountryCode = strippedStr.slice(0, 2).toUpperCase();
-  return isoCountryCode in ibanRegexThroughCountryCode && ibanRegexThroughCountryCode[isoCountryCode].test(strippedStr);
+  var isoCountryCodeInIbanRegexCodeObject = isoCountryCode in ibanRegexThroughCountryCode;
+  if (options.whitelist) {
+    if (!hasOnlyValidCountryCodes(options.whitelist)) {
+      return false;
+    }
+    var isoCountryCodeInWhiteList = (0, _includesArray.default)(options.whitelist, isoCountryCode);
+    if (!isoCountryCodeInWhiteList) {
+      return false;
+    }
+  }
+  if (options.blacklist) {
+    var isoCountryCodeInBlackList = (0, _includesArray.default)(options.blacklist, isoCountryCode);
+    if (isoCountryCodeInBlackList) {
+      return false;
+    }
+  }
+  return isoCountryCodeInIbanRegexCodeObject && ibanRegexThroughCountryCode[isoCountryCode].test(strippedStr);
 }
+
 /**
    * Check whether string has valid IBAN Checksum
    * by performing basic mod-97 operation and
@@ -30606,11 +31252,8 @@ function hasValidIbanFormat(str) {
    * @param {string} str
    * @return {boolean}
    */
-
-
 function hasValidIbanChecksum(str) {
   var strippedStr = str.replace(/[^A-Z0-9]+/gi, '').toUpperCase(); // Keep only digits and A-Z latin alphabetic
-
   var rearranged = strippedStr.slice(4) + strippedStr.slice(0, 4);
   var alphaCapsReplacedWithDigits = rearranged.replace(/[A-Z]/g, function (char) {
     return char.charCodeAt(0) - 55;
@@ -30620,14 +31263,12 @@ function hasValidIbanChecksum(str) {
   }, '');
   return remainder === 1;
 }
-
 function isIBAN(str) {
+  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(str);
-  return hasValidIbanFormat(str) && hasValidIbanChecksum(str);
+  return hasValidIbanFormat(str, options) && hasValidIbanChecksum(str);
 }
-
-var locales = Object.keys(ibanRegexThroughCountryCode);
-exports.locales = locales;
+var locales = exports.locales = Object.keys(ibanRegexThroughCountryCode);
 
 /***/ }),
 
@@ -30641,59 +31282,47 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isIMEI;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var imeiRegexWithoutHypens = /^[0-9]{15}$/;
-var imeiRegexWithHypens = /^\d{2}-\d{6}-\d{6}-\d{1}$/;
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var imeiRegexWithoutHyphens = /^[0-9]{15}$/;
+var imeiRegexWithHyphens = /^\d{2}-\d{6}-\d{6}-\d{1}$/;
 function isIMEI(str, options) {
   (0, _assertString.default)(str);
-  options = options || {}; // default regex for checking imei is the one without hyphens
+  options = options || {};
 
-  var imeiRegex = imeiRegexWithoutHypens;
+  // default regex for checking imei is the one without hyphens
 
+  var imeiRegex = imeiRegexWithoutHyphens;
   if (options.allow_hyphens) {
-    imeiRegex = imeiRegexWithHypens;
+    imeiRegex = imeiRegexWithHyphens;
   }
-
   if (!imeiRegex.test(str)) {
     return false;
   }
-
   str = str.replace(/-/g, '');
   var sum = 0,
-      mul = 2,
-      l = 14;
-
+    mul = 2,
+    l = 14;
   for (var i = 0; i < l; i++) {
     var digit = str.substring(l - i - 1, l - i);
     var tp = parseInt(digit, 10) * mul;
-
     if (tp >= 10) {
       sum += tp % 10 + 1;
     } else {
       sum += tp;
     }
-
     if (mul === 1) {
       mul += 1;
     } else {
       mul -= 1;
     }
   }
-
   var chk = (10 - sum % 10) % 10;
-
   if (chk !== parseInt(str.substring(14, 15), 10)) {
     return false;
   }
-
   return true;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30709,11 +31338,9 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isIP;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 /**
 11.3.  Examples
 
@@ -30747,28 +31374,29 @@ var IPv4SegmentFormat = '(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])';
 var IPv4AddressFormat = "(".concat(IPv4SegmentFormat, "[.]){3}").concat(IPv4SegmentFormat);
 var IPv4AddressRegExp = new RegExp("^".concat(IPv4AddressFormat, "$"));
 var IPv6SegmentFormat = '(?:[0-9a-fA-F]{1,4})';
-var IPv6AddressRegExp = new RegExp('^(' + "(?:".concat(IPv6SegmentFormat, ":){7}(?:").concat(IPv6SegmentFormat, "|:)|") + "(?:".concat(IPv6SegmentFormat, ":){6}(?:").concat(IPv4AddressFormat, "|:").concat(IPv6SegmentFormat, "|:)|") + "(?:".concat(IPv6SegmentFormat, ":){5}(?::").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,2}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){4}(?:(:").concat(IPv6SegmentFormat, "){0,1}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,3}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){3}(?:(:").concat(IPv6SegmentFormat, "){0,2}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,4}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){2}(?:(:").concat(IPv6SegmentFormat, "){0,3}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,5}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){1}(?:(:").concat(IPv6SegmentFormat, "){0,4}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,6}|:)|") + "(?::((?::".concat(IPv6SegmentFormat, "){0,5}:").concat(IPv4AddressFormat, "|(?::").concat(IPv6SegmentFormat, "){1,7}|:))") + ')(%[0-9a-zA-Z-.:]{1,})?$');
+var IPv6AddressRegExp = new RegExp('^(' + "(?:".concat(IPv6SegmentFormat, ":){7}(?:").concat(IPv6SegmentFormat, "|:)|") + "(?:".concat(IPv6SegmentFormat, ":){6}(?:").concat(IPv4AddressFormat, "|:").concat(IPv6SegmentFormat, "|:)|") + "(?:".concat(IPv6SegmentFormat, ":){5}(?::").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,2}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){4}(?:(:").concat(IPv6SegmentFormat, "){0,1}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,3}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){3}(?:(:").concat(IPv6SegmentFormat, "){0,2}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,4}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){2}(?:(:").concat(IPv6SegmentFormat, "){0,3}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,5}|:)|") + "(?:".concat(IPv6SegmentFormat, ":){1}(?:(:").concat(IPv6SegmentFormat, "){0,4}:").concat(IPv4AddressFormat, "|(:").concat(IPv6SegmentFormat, "){1,6}|:)|") + "(?::((?::".concat(IPv6SegmentFormat, "){0,5}:").concat(IPv4AddressFormat, "|(?::").concat(IPv6SegmentFormat, "){1,7}|:))") + ')(%[0-9a-zA-Z.]{1,})?$');
+function isIP(ipAddress) {
+  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  (0, _assertString.default)(ipAddress);
 
-function isIP(str) {
-  var version = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-  (0, _assertString.default)(str);
-  version = String(version);
-
+  // accessing 'arguments' for backwards compatibility: isIP(ipAddress [, version])
+  // eslint-disable-next-line prefer-rest-params
+  var version = (_typeof(options) === 'object' ? options.version : arguments[1]) || '';
   if (!version) {
-    return isIP(str, 4) || isIP(str, 6);
+    return isIP(ipAddress, {
+      version: 4
+    }) || isIP(ipAddress, {
+      version: 6
+    });
   }
-
-  if (version === '4') {
-    return IPv4AddressRegExp.test(str);
+  if (version.toString() === '4') {
+    return IPv4AddressRegExp.test(ipAddress);
   }
-
-  if (version === '6') {
-    return IPv6AddressRegExp.test(str);
+  if (version.toString() === '6') {
+    return IPv6AddressRegExp.test(ipAddress);
   }
-
   return false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30784,60 +31412,48 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isIPRange;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isIP = _interopRequireDefault(__nccwpck_require__(8253));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var subnetMaybe = /^\d{1,3}$/;
 var v4Subnet = 32;
 var v6Subnet = 128;
-
 function isIPRange(str) {
   var version = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
   (0, _assertString.default)(str);
-  var parts = str.split('/'); // parts[0] -> ip, parts[1] -> subnet
+  var parts = str.split('/');
 
+  // parts[0] -> ip, parts[1] -> subnet
   if (parts.length !== 2) {
     return false;
   }
-
   if (!subnetMaybe.test(parts[1])) {
-    return false;
-  } // Disallow preceding 0 i.e. 01, 02, ...
-
-
-  if (parts[1].length > 1 && parts[1].startsWith('0')) {
     return false;
   }
 
+  // Disallow preceding 0 i.e. 01, 02, ...
+  if (parts[1].length > 1 && parts[1].startsWith('0')) {
+    return false;
+  }
   var isValidIP = (0, _isIP.default)(parts[0], version);
-
   if (!isValidIP) {
     return false;
-  } // Define valid subnet according to IP's version
+  }
 
-
+  // Define valid subnet according to IP's version
   var expectedSubnet = null;
-
   switch (String(version)) {
     case '4':
       expectedSubnet = v4Subnet;
       break;
-
     case '6':
       expectedSubnet = v6Subnet;
       break;
-
     default:
       expectedSubnet = (0, _isIP.default)(parts[0], '6') ? v6Subnet : v4Subnet;
   }
-
   return parts[1] <= expectedSubnet && parts[1] >= 0;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30853,21 +31469,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISBN;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var possibleIsbn10 = /^(?:[0-9]{9}X|[0-9]{10})$/;
 var possibleIsbn13 = /^(?:[0-9]{13})$/;
 var factor = [1, 3];
-
 function isISBN(isbn, options) {
-  (0, _assertString.default)(isbn); // For backwards compatibility:
+  (0, _assertString.default)(isbn);
+
+  // For backwards compatibility:
   // isISBN(str [, version]), i.e. `options` could be used as argument for the legacy `version`
-
   var version = String((options === null || options === void 0 ? void 0 : options.version) || options);
-
   if (!(options !== null && options !== void 0 && options.version || options)) {
     return isISBN(isbn, {
       version: 10
@@ -30875,25 +31487,20 @@ function isISBN(isbn, options) {
       version: 13
     });
   }
-
   var sanitizedIsbn = isbn.replace(/[\s-]+/g, '');
   var checksum = 0;
-
   if (version === '10') {
     if (!possibleIsbn10.test(sanitizedIsbn)) {
       return false;
     }
-
     for (var i = 0; i < version - 1; i++) {
       checksum += (i + 1) * sanitizedIsbn.charAt(i);
     }
-
     if (sanitizedIsbn.charAt(9) === 'X') {
       checksum += 10 * 10;
     } else {
       checksum += 10 * sanitizedIsbn.charAt(9);
     }
-
     if (checksum % 11 === 0) {
       return true;
     }
@@ -30901,19 +31508,15 @@ function isISBN(isbn, options) {
     if (!possibleIsbn13.test(sanitizedIsbn)) {
       return false;
     }
-
     for (var _i = 0; _i < 12; _i++) {
       checksum += factor[_i % 2] * sanitizedIsbn.charAt(_i);
     }
-
     if (sanitizedIsbn.charAt(12) - (10 - checksum % 10) % 10 === 0) {
       return true;
     }
   }
-
   return false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -30929,12 +31532,11 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISIN;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var isin = /^[A-Z]{2}[0-9A-Z]{9}[0-9]$/;
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var isin = /^[A-Z]{2}[0-9A-Z]{9}[0-9]$/; // this link details how the check digit is calculated:
+// this link details how the check digit is calculated:
 // https://www.isin.org/isin-format/. it is a little bit
 // odd in that it works with digits, not numbers. in order
 // to make only one pass through the ISIN characters, the
@@ -30943,24 +31545,21 @@ var isin = /^[A-Z]{2}[0-9A-Z]{9}[0-9]$/; // this link details how the check digi
 
 function isISIN(str) {
   (0, _assertString.default)(str);
-
   if (!isin.test(str)) {
     return false;
   }
-
   var double = true;
-  var sum = 0; // convert values
-
+  var sum = 0;
+  // convert values
   for (var i = str.length - 2; i >= 0; i--) {
     if (str[i] >= 'A' && str[i] <= 'Z') {
       var value = str[i].charCodeAt(0) - 55;
       var lo = value % 10;
-      var hi = Math.trunc(value / 10); // letters have two digits, so handle the low order
+      var hi = Math.trunc(value / 10);
+      // letters have two digits, so handle the low order
       // and high order digits separately.
-
       for (var _i = 0, _arr = [lo, hi]; _i < _arr.length; _i++) {
         var digit = _arr[_i];
-
         if (double) {
           if (digit >= 5) {
             sum += 1 + (digit - 5) * 2;
@@ -30970,12 +31569,10 @@ function isISIN(str) {
         } else {
           sum += digit;
         }
-
         double = !double;
       }
     } else {
       var _digit = str[i].charCodeAt(0) - '0'.charCodeAt(0);
-
       if (double) {
         if (_digit >= 5) {
           sum += 1 + (_digit - 5) * 2;
@@ -30985,17 +31582,37 @@ function isISIN(str) {
       } else {
         sum += _digit;
       }
-
       double = !double;
     }
   }
-
   var check = Math.trunc((sum + 9) / 10) * 10 - sum;
   return +str[str.length - 1] === check;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
+
+/***/ }),
+
+/***/ 8426:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.ScriptCodes = void 0;
+exports["default"] = isISO15924;
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+// from https://www.unicode.org/iso15924/iso15924-codes.html
+var validISO15924Codes = new Set(['Adlm', 'Afak', 'Aghb', 'Ahom', 'Arab', 'Aran', 'Armi', 'Armn', 'Avst', 'Bali', 'Bamu', 'Bass', 'Batk', 'Beng', 'Bhks', 'Blis', 'Bopo', 'Brah', 'Brai', 'Bugi', 'Buhd', 'Cakm', 'Cans', 'Cari', 'Cham', 'Cher', 'Chis', 'Chrs', 'Cirt', 'Copt', 'Cpmn', 'Cprt', 'Cyrl', 'Cyrs', 'Deva', 'Diak', 'Dogr', 'Dsrt', 'Dupl', 'Egyd', 'Egyh', 'Egyp', 'Elba', 'Elym', 'Ethi', 'Gara', 'Geok', 'Geor', 'Glag', 'Gong', 'Gonm', 'Goth', 'Gran', 'Grek', 'Gujr', 'Gukh', 'Guru', 'Hanb', 'Hang', 'Hani', 'Hano', 'Hans', 'Hant', 'Hatr', 'Hebr', 'Hira', 'Hluw', 'Hmng', 'Hmnp', 'Hrkt', 'Hung', 'Inds', 'Ital', 'Jamo', 'Java', 'Jpan', 'Jurc', 'Kali', 'Kana', 'Kawi', 'Khar', 'Khmr', 'Khoj', 'Kitl', 'Kits', 'Knda', 'Kore', 'Kpel', 'Krai', 'Kthi', 'Lana', 'Laoo', 'Latf', 'Latg', 'Latn', 'Leke', 'Lepc', 'Limb', 'Lina', 'Linb', 'Lisu', 'Loma', 'Lyci', 'Lydi', 'Mahj', 'Maka', 'Mand', 'Mani', 'Marc', 'Maya', 'Medf', 'Mend', 'Merc', 'Mero', 'Mlym', 'Modi', 'Mong', 'Moon', 'Mroo', 'Mtei', 'Mult', 'Mymr', 'Nagm', 'Nand', 'Narb', 'Nbat', 'Newa', 'Nkdb', 'Nkgb', 'Nkoo', 'Nshu', 'Ogam', 'Olck', 'Onao', 'Orkh', 'Orya', 'Osge', 'Osma', 'Ougr', 'Palm', 'Pauc', 'Pcun', 'Pelm', 'Perm', 'Phag', 'Phli', 'Phlp', 'Phlv', 'Phnx', 'Plrd', 'Piqd', 'Prti', 'Psin', 'Qaaa', 'Qaab', 'Qaac', 'Qaad', 'Qaae', 'Qaaf', 'Qaag', 'Qaah', 'Qaai', 'Qaaj', 'Qaak', 'Qaal', 'Qaam', 'Qaan', 'Qaao', 'Qaap', 'Qaaq', 'Qaar', 'Qaas', 'Qaat', 'Qaau', 'Qaav', 'Qaaw', 'Qaax', 'Qaay', 'Qaaz', 'Qaba', 'Qabb', 'Qabc', 'Qabd', 'Qabe', 'Qabf', 'Qabg', 'Qabh', 'Qabi', 'Qabj', 'Qabk', 'Qabl', 'Qabm', 'Qabn', 'Qabo', 'Qabp', 'Qabq', 'Qabr', 'Qabs', 'Qabt', 'Qabu', 'Qabv', 'Qabw', 'Qabx', 'Ranj', 'Rjng', 'Rohg', 'Roro', 'Runr', 'Samr', 'Sara', 'Sarb', 'Saur', 'Sgnw', 'Shaw', 'Shrd', 'Shui', 'Sidd', 'Sidt', 'Sind', 'Sinh', 'Sogd', 'Sogo', 'Sora', 'Soyo', 'Sund', 'Sunu', 'Sylo', 'Syrc', 'Syre', 'Syrj', 'Syrn', 'Tagb', 'Takr', 'Tale', 'Talu', 'Taml', 'Tang', 'Tavt', 'Tayo', 'Telu', 'Teng', 'Tfng', 'Tglg', 'Thaa', 'Thai', 'Tibt', 'Tirh', 'Tnsa', 'Todr', 'Tols', 'Toto', 'Tutg', 'Ugar', 'Vaii', 'Visp', 'Vith', 'Wara', 'Wcho', 'Wole', 'Xpeo', 'Xsux', 'Yezi', 'Yiii', 'Zanb', 'Zinh', 'Zmth', 'Zsye', 'Zsym', 'Zxxx', 'Zyyy', 'Zzzz']);
+function isISO15924(str) {
+  (0, _assertString.default)(str);
+  return validISO15924Codes.has(str);
+}
+var ScriptCodes = exports.ScriptCodes = validISO15924Codes;
 
 /***/ }),
 
@@ -31008,23 +31625,29 @@ module.exports["default"] = exports.default;
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports["default"] = isISO31661Alpha2;
 exports.CountryCodes = void 0;
-
+exports["default"] = isISO31661Alpha2;
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // from https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
 var validISO31661Alpha2CountriesCodes = new Set(['AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AW', 'AX', 'AZ', 'BA', 'BB', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BL', 'BM', 'BN', 'BO', 'BQ', 'BR', 'BS', 'BT', 'BV', 'BW', 'BY', 'BZ', 'CA', 'CC', 'CD', 'CF', 'CG', 'CH', 'CI', 'CK', 'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CW', 'CX', 'CY', 'CZ', 'DE', 'DJ', 'DK', 'DM', 'DO', 'DZ', 'EC', 'EE', 'EG', 'EH', 'ER', 'ES', 'ET', 'FI', 'FJ', 'FK', 'FM', 'FO', 'FR', 'GA', 'GB', 'GD', 'GE', 'GF', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GP', 'GQ', 'GR', 'GS', 'GT', 'GU', 'GW', 'GY', 'HK', 'HM', 'HN', 'HR', 'HT', 'HU', 'ID', 'IE', 'IL', 'IM', 'IN', 'IO', 'IQ', 'IR', 'IS', 'IT', 'JE', 'JM', 'JO', 'JP', 'KE', 'KG', 'KH', 'KI', 'KM', 'KN', 'KP', 'KR', 'KW', 'KY', 'KZ', 'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV', 'LY', 'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MH', 'MK', 'ML', 'MM', 'MN', 'MO', 'MP', 'MQ', 'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ', 'NA', 'NC', 'NE', 'NF', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NU', 'NZ', 'OM', 'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PM', 'PN', 'PR', 'PS', 'PT', 'PW', 'PY', 'QA', 'RE', 'RO', 'RS', 'RU', 'RW', 'SA', 'SB', 'SC', 'SD', 'SE', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST', 'SV', 'SX', 'SY', 'SZ', 'TC', 'TD', 'TF', 'TG', 'TH', 'TJ', 'TK', 'TL', 'TM', 'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY', 'UZ', 'VA', 'VC', 'VE', 'VG', 'VI', 'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW']);
-
+var alpha2CountryCode = /^[a-zA-Z]{2}$/;
 function isISO31661Alpha2(str) {
+  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(str);
+  var userAssignedCodes = options.userAssignedCodes;
+  var validUserAssignedCodes = (userAssignedCodes || []).reduce(function (accumulator, userAssignedCode) {
+    if (alpha2CountryCode.test(userAssignedCode)) {
+      accumulator.push(userAssignedCode.toUpperCase());
+    }
+    return accumulator;
+  }, []);
+  if (validUserAssignedCodes.includes(str.toUpperCase())) {
+    return true;
+  }
   return validISO31661Alpha2CountriesCodes.has(str.toUpperCase());
 }
-
-var CountryCodes = validISO31661Alpha2CountriesCodes;
-exports.CountryCodes = CountryCodes;
+var CountryCodes = exports.CountryCodes = validISO31661Alpha2CountriesCodes;
 
 /***/ }),
 
@@ -31038,19 +31661,49 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISO31661Alpha3;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // from https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3
 var validISO31661Alpha3CountriesCodes = new Set(['AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE', 'BHS', 'BHR', 'BGD', 'BRB', 'BLR', 'BEL', 'BLZ', 'BEN', 'BMU', 'BTN', 'BOL', 'BES', 'BIH', 'BWA', 'BVT', 'BRA', 'IOT', 'BRN', 'BGR', 'BFA', 'BDI', 'KHM', 'CMR', 'CAN', 'CPV', 'CYM', 'CAF', 'TCD', 'CHL', 'CHN', 'CXR', 'CCK', 'COL', 'COM', 'COG', 'COD', 'COK', 'CRI', 'CIV', 'HRV', 'CUB', 'CUW', 'CYP', 'CZE', 'DNK', 'DJI', 'DMA', 'DOM', 'ECU', 'EGY', 'SLV', 'GNQ', 'ERI', 'EST', 'ETH', 'FLK', 'FRO', 'FJI', 'FIN', 'FRA', 'GUF', 'PYF', 'ATF', 'GAB', 'GMB', 'GEO', 'DEU', 'GHA', 'GIB', 'GRC', 'GRL', 'GRD', 'GLP', 'GUM', 'GTM', 'GGY', 'GIN', 'GNB', 'GUY', 'HTI', 'HMD', 'VAT', 'HND', 'HKG', 'HUN', 'ISL', 'IND', 'IDN', 'IRN', 'IRQ', 'IRL', 'IMN', 'ISR', 'ITA', 'JAM', 'JPN', 'JEY', 'JOR', 'KAZ', 'KEN', 'KIR', 'PRK', 'KOR', 'KWT', 'KGZ', 'LAO', 'LVA', 'LBN', 'LSO', 'LBR', 'LBY', 'LIE', 'LTU', 'LUX', 'MAC', 'MKD', 'MDG', 'MWI', 'MYS', 'MDV', 'MLI', 'MLT', 'MHL', 'MTQ', 'MRT', 'MUS', 'MYT', 'MEX', 'FSM', 'MDA', 'MCO', 'MNG', 'MNE', 'MSR', 'MAR', 'MOZ', 'MMR', 'NAM', 'NRU', 'NPL', 'NLD', 'NCL', 'NZL', 'NIC', 'NER', 'NGA', 'NIU', 'NFK', 'MNP', 'NOR', 'OMN', 'PAK', 'PLW', 'PSE', 'PAN', 'PNG', 'PRY', 'PER', 'PHL', 'PCN', 'POL', 'PRT', 'PRI', 'QAT', 'REU', 'ROU', 'RUS', 'RWA', 'BLM', 'SHN', 'KNA', 'LCA', 'MAF', 'SPM', 'VCT', 'WSM', 'SMR', 'STP', 'SAU', 'SEN', 'SRB', 'SYC', 'SLE', 'SGP', 'SXM', 'SVK', 'SVN', 'SLB', 'SOM', 'ZAF', 'SGS', 'SSD', 'ESP', 'LKA', 'SDN', 'SUR', 'SJM', 'SWZ', 'SWE', 'CHE', 'SYR', 'TWN', 'TJK', 'TZA', 'THA', 'TLS', 'TGO', 'TKL', 'TON', 'TTO', 'TUN', 'TUR', 'TKM', 'TCA', 'TUV', 'UGA', 'UKR', 'ARE', 'GBR', 'USA', 'UMI', 'URY', 'UZB', 'VUT', 'VEN', 'VNM', 'VGB', 'VIR', 'WLF', 'ESH', 'YEM', 'ZMB', 'ZWE']);
-
+var alpha3CountryCode = /^[a-zA-Z]{3}$/;
 function isISO31661Alpha3(str) {
+  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(str);
+  var userAssignedCodes = options.userAssignedCodes;
+  var validUserAssignedCodes = (userAssignedCodes || []).reduce(function (accumulator, userAssignedCode) {
+    if (alpha3CountryCode.test(userAssignedCode)) {
+      accumulator.push(userAssignedCode.toUpperCase());
+    }
+    return accumulator;
+  }, []);
+  if (validUserAssignedCodes.includes(str.toUpperCase())) {
+    return true;
+  }
   return validISO31661Alpha3CountriesCodes.has(str.toUpperCase());
 }
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
+/***/ }),
+
+/***/ 1215:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = isISO31661Numeric;
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+// from https://en.wikipedia.org/wiki/ISO_3166-1_numeric
+var validISO31661NumericCountriesCodes = new Set(['004', '008', '010', '012', '016', '020', '024', '028', '031', '032', '036', '040', '044', '048', '050', '051', '052', '056', '060', '064', '068', '070', '072', '074', '076', '084', '086', '090', '092', '096', '100', '104', '108', '112', '116', '120', '124', '132', '136', '140', '144', '148', '152', '156', '158', '162', '166', '170', '174', '175', '178', '180', '184', '188', '191', '192', '196', '203', '204', '208', '212', '214', '218', '222', '226', '231', '232', '233', '234', '238', '239', '242', '246', '248', '250', '254', '258', '260', '262', '266', '268', '270', '275', '276', '288', '292', '296', '300', '304', '308', '312', '316', '320', '324', '328', '332', '334', '336', '340', '344', '348', '352', '356', '360', '364', '368', '372', '376', '380', '384', '388', '392', '398', '400', '404', '408', '410', '414', '417', '418', '422', '426', '428', '430', '434', '438', '440', '442', '446', '450', '454', '458', '462', '466', '470', '474', '478', '480', '484', '492', '496', '498', '499', '500', '504', '508', '512', '516', '520', '524', '528', '531', '533', '534', '535', '540', '548', '554', '558', '562', '566', '570', '574', '578', '580', '581', '583', '584', '585', '586', '591', '598', '600', '604', '608', '612', '616', '620', '624', '626', '630', '634', '638', '642', '643', '646', '652', '654', '659', '660', '662', '663', '666', '670', '674', '678', '682', '686', '688', '690', '694', '702', '703', '704', '705', '706', '710', '716', '724', '728', '729', '732', '740', '744', '748', '752', '756', '760', '762', '764', '768', '772', '776', '780', '784', '788', '792', '795', '796', '798', '800', '804', '807', '818', '826', '831', '832', '833', '834', '840', '850', '854', '858', '860', '862', '876', '882', '887', '894']);
+function isISO31661Numeric(str) {
+  (0, _assertString.default)(str);
+  return validISO31661NumericCountriesCodes.has(str);
+}
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31065,23 +31718,59 @@ module.exports["default"] = exports.default;
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports["default"] = isISO4217;
 exports.CurrencyCodes = void 0;
-
+exports["default"] = isISO4217;
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // from https://en.wikipedia.org/wiki/ISO_4217
-var validISO4217CurrencyCodes = new Set(['AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BOV', 'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHE', 'CHF', 'CHW', 'CLF', 'CLP', 'CNY', 'COP', 'COU', 'CRC', 'CUC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK', 'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD', 'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN', 'MXV', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD', 'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLL', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'USN', 'UYI', 'UYU', 'UYW', 'UZS', 'VES', 'VND', 'VUV', 'WST', 'XAF', 'XAG', 'XAU', 'XBA', 'XBB', 'XBC', 'XBD', 'XCD', 'XDR', 'XOF', 'XPD', 'XPF', 'XPT', 'XSU', 'XTS', 'XUA', 'XXX', 'YER', 'ZAR', 'ZMW', 'ZWL']);
-
+var validISO4217CurrencyCodes = new Set(['AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BOV', 'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHE', 'CHF', 'CHW', 'CLF', 'CLP', 'CNY', 'COP', 'COU', 'CRC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK', 'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD', 'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN', 'MXV', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD', 'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLE', 'SLL', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'USN', 'UYI', 'UYU', 'UYW', 'UZS', 'VED', 'VES', 'VND', 'VUV', 'WST', 'XAF', 'XAG', 'XAU', 'XBA', 'XBB', 'XBC', 'XBD', 'XCD', 'XDR', 'XOF', 'XPD', 'XPF', 'XPT', 'XSU', 'XTS', 'XUA', 'XXX', 'YER', 'ZAR', 'ZMW', 'ZWL']);
 function isISO4217(str) {
   (0, _assertString.default)(str);
   return validISO4217CurrencyCodes.has(str.toUpperCase());
 }
+var CurrencyCodes = exports.CurrencyCodes = validISO4217CurrencyCodes;
 
-var CurrencyCodes = validISO4217CurrencyCodes;
-exports.CurrencyCodes = CurrencyCodes;
+/***/ }),
+
+/***/ 7446:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.isFreightContainerID = void 0;
+exports.isISO6346 = isISO6346;
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+// https://en.wikipedia.org/wiki/ISO_6346
+// according to ISO6346 standard, checksum digit is mandatory for freight container but recommended
+// for other container types (J and Z)
+var isISO6346Str = /^[A-Z]{3}(U[0-9]{7})|([J,Z][0-9]{6,7})$/;
+var isDigit = /^[0-9]$/;
+function isISO6346(str) {
+  (0, _assertString.default)(str);
+  str = str.toUpperCase();
+  if (!isISO6346Str.test(str)) return false;
+  if (str.length === 11) {
+    var sum = 0;
+    for (var i = 0; i < str.length - 1; i++) {
+      if (!isDigit.test(str[i])) {
+        var convertedCode = void 0;
+        var letterCode = str.charCodeAt(i) - 55;
+        if (letterCode < 11) convertedCode = letterCode;else if (letterCode >= 11 && letterCode <= 20) convertedCode = 12 + letterCode % 11;else if (letterCode >= 21 && letterCode <= 30) convertedCode = 23 + letterCode % 21;else convertedCode = 34 + letterCode % 31;
+        sum += convertedCode * Math.pow(2, i);
+      } else sum += str[i] * Math.pow(2, i);
+    }
+    var checkSumDigit = sum % 11;
+    if (checkSumDigit === 10) checkSumDigit = 0;
+    return Number(str[str.length - 1]) === checkSumDigit;
+  }
+  return true;
+}
+var isFreightContainerID = exports.isFreightContainerID = isISO6346;
 
 /***/ }),
 
@@ -31095,18 +31784,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISO6391;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var isISO6391Set = new Set(['aa', 'ab', 'ae', 'af', 'ak', 'am', 'an', 'ar', 'as', 'av', 'ay', 'az', 'az', 'ba', 'be', 'bg', 'bh', 'bi', 'bm', 'bn', 'bo', 'br', 'bs', 'ca', 'ce', 'ch', 'co', 'cr', 'cs', 'cu', 'cv', 'cy', 'da', 'de', 'dv', 'dz', 'ee', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'ff', 'fi', 'fj', 'fo', 'fr', 'fy', 'ga', 'gd', 'gl', 'gn', 'gu', 'gv', 'ha', 'he', 'hi', 'ho', 'hr', 'ht', 'hu', 'hy', 'hz', 'ia', 'id', 'ie', 'ig', 'ii', 'ik', 'io', 'is', 'it', 'iu', 'ja', 'jv', 'ka', 'kg', 'ki', 'kj', 'kk', 'kl', 'km', 'kn', 'ko', 'kr', 'ks', 'ku', 'kv', 'kw', 'ky', 'la', 'lb', 'lg', 'li', 'ln', 'lo', 'lt', 'lu', 'lv', 'mg', 'mh', 'mi', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'my', 'na', 'nb', 'nd', 'ne', 'ng', 'nl', 'nn', 'no', 'nr', 'nv', 'ny', 'oc', 'oj', 'om', 'or', 'os', 'pa', 'pi', 'pl', 'ps', 'pt', 'qu', 'rm', 'rn', 'ro', 'ru', 'rw', 'sa', 'sc', 'sd', 'se', 'sg', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sq', 'sr', 'ss', 'st', 'su', 'sv', 'sw', 'ta', 'te', 'tg', 'th', 'ti', 'tk', 'tl', 'tn', 'to', 'tr', 'ts', 'tt', 'tw', 'ty', 'ug', 'uk', 'ur', 'uz', 've', 'vi', 'vo', 'wa', 'wo', 'xh', 'yi', 'yo', 'za', 'zh', 'zu']);
-
 function isISO6391(str) {
   (0, _assertString.default)(str);
   return isISO6391Set.has(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31122,49 +31806,41 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISO8601;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /* eslint-disable max-len */
 // from http://goo.gl/0ejHHW
-var iso8601 = /^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/; // same as above, except with a strict 'T' separator between date and time
-
+var iso8601 = /^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
+// same as above, except with a strict 'T' separator between date and time
 var iso8601StrictSeparator = /^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
 /* eslint-enable max-len */
-
 var isValidDate = function isValidDate(str) {
   // str must have passed the ISO8601 check
   // this check is meant to catch invalid dates
   // like 2009-02-31
   // first check for ordinal dates
   var ordinalMatch = str.match(/^(\d{4})-?(\d{3})([ T]{1}\.*|$)/);
-
   if (ordinalMatch) {
     var oYear = Number(ordinalMatch[1]);
-    var oDay = Number(ordinalMatch[2]); // if is leap year
-
+    var oDay = Number(ordinalMatch[2]);
+    // if is leap year
     if (oYear % 4 === 0 && oYear % 100 !== 0 || oYear % 400 === 0) return oDay <= 366;
     return oDay <= 365;
   }
-
   var match = str.match(/(\d{4})-?(\d{0,2})-?(\d*)/).map(Number);
   var year = match[1];
   var month = match[2];
   var day = match[3];
   var monthString = month ? "0".concat(month).slice(-2) : month;
-  var dayString = day ? "0".concat(day).slice(-2) : day; // create a date object and compare
+  var dayString = day ? "0".concat(day).slice(-2) : day;
 
+  // create a date object and compare
   var d = new Date("".concat(year, "-").concat(monthString || '01', "-").concat(dayString || '01'));
-
   if (month && day) {
     return d.getUTCFullYear() === year && d.getUTCMonth() + 1 === month && d.getUTCDate() === day;
   }
-
   return true;
 };
-
 function isISO8601(str) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(str);
@@ -31172,7 +31848,6 @@ function isISO8601(str) {
   if (check && options.strict) return isValidDate(str);
   return check;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31188,19 +31863,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISRC;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // see http://isrc.ifpi.org/en/isrc-standard/code-syntax
 var isrc = /^[A-Z]{2}[0-9A-Z]{3}\d{2}\d{5}$/;
-
 function isISRC(str) {
   (0, _assertString.default)(str);
   return isrc.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31216,35 +31886,26 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isISSN;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var issn = '^\\d{4}-?\\d{3}[\\dX]$';
-
 function isISSN(str) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   (0, _assertString.default)(str);
   var testIssn = issn;
   testIssn = options.require_hyphen ? testIssn.replace('?', '') : testIssn;
   testIssn = options.case_sensitive ? new RegExp(testIssn) : new RegExp(testIssn, 'i');
-
   if (!testIssn.test(str)) {
     return false;
   }
-
   var digits = str.replace('-', '').toUpperCase();
   var checksum = 0;
-
   for (var i = 0; i < digits.length; i++) {
     var digit = digits[i];
     checksum += (digit === 'X' ? 10 : +digit) * (8 - i);
   }
-
   return checksum % 11 === 0;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31260,13 +31921,10 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isIdentityCard;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
+var _includesArray = _interopRequireDefault(__nccwpck_require__(2776));
 var _isInt = _interopRequireDefault(__nccwpck_require__(7205));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var validators = {
   PL: function PL(str) {
     (0, _assertString.default)(str);
@@ -31283,7 +31941,6 @@ var validators = {
       10: 3,
       11: 0
     };
-
     if (str != null && str.length === 11 && (0, _isInt.default)(str, {
       allow_leading_zeroes: true
     })) {
@@ -31293,12 +31950,10 @@ var validators = {
       }, 0);
       var modulo = sum % 10;
       var lastDigit = Number(str.charAt(str.length - 1));
-
       if (modulo === 0 && lastDigit === 0 || lastDigit === 10 - modulo) {
         return true;
       }
     }
-
     return false;
   },
   ES: function ES(str) {
@@ -31309,15 +31964,17 @@ var validators = {
       Y: 1,
       Z: 2
     };
-    var controlDigits = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E']; // sanitize user input
+    var controlDigits = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E'];
 
-    var sanitized = str.trim().toUpperCase(); // validate the data structure
+    // sanitize user input
+    var sanitized = str.trim().toUpperCase();
 
+    // validate the data structure
     if (!DNI.test(sanitized)) {
       return false;
-    } // validate the control digit
+    }
 
-
+    // validate the control digit
     var number = sanitized.slice(0, -1).replace(/[X,Y,Z]/g, function (char) {
       return charsValue[char];
     });
@@ -31326,15 +31983,12 @@ var validators = {
   FI: function FI(str) {
     // https://dvv.fi/en/personal-identity-code#:~:text=control%20character%20for%20a-,personal,-identity%20code%20calculated
     (0, _assertString.default)(str);
-
     if (str.length !== 11) {
       return false;
     }
-
     if (!str.match(/^\d{6}[\-A\+]\d{3}[0-9ABCDEFHJKLMNPRSTUVWXY]{1}$/)) {
       return false;
     }
-
     var checkDigits = '0123456789ABCDEFHJKLMNPRSTUVWXY';
     var idAsNumber = parseInt(str.slice(0, 6), 10) * 1000 + parseInt(str.slice(7, 10), 10);
     var remainder = idAsNumber % 31;
@@ -31342,18 +31996,21 @@ var validators = {
     return checkDigit === str.slice(10, 11);
   },
   IN: function IN(str) {
-    var DNI = /^[1-9]\d{3}\s?\d{4}\s?\d{4}$/; // multiplication table
+    var DNI = /^[1-9]\d{3}\s?\d{4}\s?\d{4}$/;
 
-    var d = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5], [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7], [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1], [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3], [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]]; // permutation table
+    // multiplication table
+    var d = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5], [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7], [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1], [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3], [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]];
 
-    var p = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]]; // sanitize user input
+    // permutation table
+    var p = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]];
 
-    var sanitized = str.trim(); // validate the data structure
+    // sanitize user input
+    var sanitized = str.trim();
 
+    // validate the data structure
     if (!DNI.test(sanitized)) {
       return false;
     }
-
     var c = 0;
     var invertedArray = sanitized.replace(/\s/g, '').split('').map(Number).reverse();
     invertedArray.forEach(function (val, i) {
@@ -31367,26 +32024,24 @@ var validators = {
     if (parseInt(str.slice(3, 9), 10) === 0) return false;
     var lastNumber = parseInt(str.slice(9, 10), 10);
     var sum = 0;
-
     for (var i = 0; i < 9; i++) {
       sum += parseInt(str.slice(i, i + 1), 10) * (10 - i);
     }
-
     sum %= 11;
     return sum < 2 && lastNumber === sum || sum >= 2 && lastNumber === 11 - sum;
   },
   IT: function IT(str) {
     if (str.length !== 9) return false;
     if (str === 'CA00000AA') return false; // https://it.wikipedia.org/wiki/Carta_d%27identit%C3%A0_elettronica_italiana
-
-    return str.search(/C[A-Z][0-9]{5}[A-Z]{2}/i) > -1;
+    return str.search(/C[A-Z]\d{5}[A-Z]{2}/i) > -1;
   },
   NO: function NO(str) {
     var sanitized = str.trim();
     if (isNaN(Number(sanitized))) return false;
     if (sanitized.length !== 11) return false;
-    if (sanitized === '00000000000') return false; // https://no.wikipedia.org/wiki/F%C3%B8dselsnummer
+    if (sanitized === '00000000000') return false;
 
+    // https://no.wikipedia.org/wiki/F%C3%B8dselsnummer
     var f = sanitized.split('').map(Number);
     var k1 = (11 - (3 * f[0] + 7 * f[1] + 6 * f[2] + 1 * f[3] + 8 * f[4] + 9 * f[5] + 4 * f[6] + 5 * f[7] + 2 * f[8]) % 11) % 11;
     var k2 = (11 - (5 * f[0] + 4 * f[1] + 3 * f[2] + 2 * f[3] + 7 * f[4] + 6 * f[5] + 5 * f[6] + 4 * f[7] + 3 * f[8] + 2 * k1) % 11) % 11;
@@ -31394,14 +32049,13 @@ var validators = {
     return true;
   },
   TH: function TH(str) {
-    if (!str.match(/^[1-8]\d{12}$/)) return false; // validate check digit
+    if (!str.match(/^[1-8]\d{12}$/)) return false;
 
+    // validate check digit
     var sum = 0;
-
     for (var i = 0; i < 12; i++) {
       sum += parseInt(str[i], 10) * (13 - i);
     }
-
     return str[12] === ((11 - sum % 11) % 10).toString();
   },
   LK: function LK(str) {
@@ -31411,124 +32065,140 @@ var validators = {
     return false;
   },
   'he-IL': function heIL(str) {
-    var DNI = /^\d{9}$/; // sanitize user input
+    var DNI = /^\d{9}$/;
 
-    var sanitized = str.trim(); // validate the data structure
+    // sanitize user input
+    var sanitized = str.trim();
 
+    // validate the data structure
     if (!DNI.test(sanitized)) {
       return false;
     }
-
     var id = sanitized;
     var sum = 0,
-        incNum;
-
+      incNum;
     for (var i = 0; i < id.length; i++) {
       incNum = Number(id[i]) * (i % 2 + 1); // Multiply number by 1 or 2
-
       sum += incNum > 9 ? incNum - 9 : incNum; // Sum the digits up and add to total
     }
-
     return sum % 10 === 0;
   },
   'ar-LY': function arLY(str) {
     // Libya National Identity Number NIN is 12 digits, the first digit is either 1 or 2
-    var NIN = /^(1|2)\d{11}$/; // sanitize user input
+    var NIN = /^(1|2)\d{11}$/;
 
-    var sanitized = str.trim(); // validate the data structure
-
-    if (!NIN.test(sanitized)) {
-      return false;
-    }
-
-    return true;
+    // sanitize user input
+    var sanitized = str.trim();
+    return NIN.test(sanitized);
   },
   'ar-TN': function arTN(str) {
-    var DNI = /^\d{8}$/; // sanitize user input
+    var DNI = /^\d{8}$/;
 
-    var sanitized = str.trim(); // validate the data structure
-
-    if (!DNI.test(sanitized)) {
-      return false;
-    }
-
-    return true;
+    // sanitize user input
+    var sanitized = str.trim();
+    return DNI.test(sanitized);
   },
   'zh-CN': function zhCN(str) {
-    var provincesAndCities = ['11', // 北京
-    '12', // 天津
-    '13', // 河北
-    '14', // 山西
-    '15', // 内蒙古
-    '21', // 辽宁
-    '22', // 吉林
-    '23', // 黑龙江
-    '31', // 上海
-    '32', // 江苏
-    '33', // 浙江
-    '34', // 安徽
-    '35', // 福建
-    '36', // 江西
-    '37', // 山东
-    '41', // 河南
-    '42', // 湖北
-    '43', // 湖南
-    '44', // 广东
-    '45', // 广西
-    '46', // 海南
-    '50', // 重庆
-    '51', // 四川
-    '52', // 贵州
-    '53', // 云南
-    '54', // 西藏
-    '61', // 陕西
-    '62', // 甘肃
-    '63', // 青海
-    '64', // 宁夏
-    '65', // 新疆
-    '71', // 台湾
-    '81', // 香港
-    '82', // 澳门
+    var provincesAndCities = ['11',
+    // 北京
+    '12',
+    // 天津
+    '13',
+    // 河北
+    '14',
+    // 山西
+    '15',
+    // 内蒙古
+    '21',
+    // 辽宁
+    '22',
+    // 吉林
+    '23',
+    // 黑龙江
+    '31',
+    // 上海
+    '32',
+    // 江苏
+    '33',
+    // 浙江
+    '34',
+    // 安徽
+    '35',
+    // 福建
+    '36',
+    // 江西
+    '37',
+    // 山东
+    '41',
+    // 河南
+    '42',
+    // 湖北
+    '43',
+    // 湖南
+    '44',
+    // 广东
+    '45',
+    // 广西
+    '46',
+    // 海南
+    '50',
+    // 重庆
+    '51',
+    // 四川
+    '52',
+    // 贵州
+    '53',
+    // 云南
+    '54',
+    // 西藏
+    '61',
+    // 陕西
+    '62',
+    // 甘肃
+    '63',
+    // 青海
+    '64',
+    // 宁夏
+    '65',
+    // 新疆
+    '71',
+    // 台湾
+    '81',
+    // 香港
+    '82',
+    // 澳门
     '91' // 国外
     ];
     var powers = ['7', '9', '10', '5', '8', '4', '2', '1', '6', '3', '7', '9', '10', '5', '8', '4', '2'];
     var parityBit = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
-
     var checkAddressCode = function checkAddressCode(addressCode) {
-      return provincesAndCities.includes(addressCode);
+      return (0, _includesArray.default)(provincesAndCities, addressCode);
     };
-
     var checkBirthDayCode = function checkBirthDayCode(birDayCode) {
       var yyyy = parseInt(birDayCode.substring(0, 4), 10);
       var mm = parseInt(birDayCode.substring(4, 6), 10);
       var dd = parseInt(birDayCode.substring(6), 10);
       var xdata = new Date(yyyy, mm - 1, dd);
-
       if (xdata > new Date()) {
-        return false; // eslint-disable-next-line max-len
+        return false;
+        // eslint-disable-next-line max-len
       } else if (xdata.getFullYear() === yyyy && xdata.getMonth() === mm - 1 && xdata.getDate() === dd) {
         return true;
       }
-
       return false;
     };
-
     var getParityBit = function getParityBit(idCardNo) {
       var id17 = idCardNo.substring(0, 17);
       var power = 0;
-
       for (var i = 0; i < 17; i++) {
         power += parseInt(id17.charAt(i), 10) * parseInt(powers[i], 10);
       }
-
       var mod = power % 11;
       return parityBit[mod];
     };
-
     var checkParityBit = function checkParityBit(idCardNo) {
       return getParityBit(idCardNo) === idCardNo.charAt(17).toUpperCase();
     };
-
     var check15IdCardNo = function check15IdCardNo(idCardNo) {
       var check = /^[1-9]\d{7}((0[1-9])|(1[0-2]))((0[1-9])|([1-2][0-9])|(3[0-1]))\d{3}$/.test(idCardNo);
       if (!check) return false;
@@ -31540,7 +32210,6 @@ var validators = {
       if (!check) return false;
       return true;
     };
-
     var check18IdCardNo = function check18IdCardNo(idCardNo) {
       var check = /^[1-9]\d{5}[1-9]\d{3}((0[1-9])|(1[0-2]))((0[1-9])|([1-2][0-9])|(3[0-1]))\d{3}(\d|x|X)$/.test(idCardNo);
       if (!check) return false;
@@ -31552,40 +32221,36 @@ var validators = {
       if (!check) return false;
       return checkParityBit(idCardNo);
     };
-
     var checkIdCardNo = function checkIdCardNo(idCardNo) {
       var check = /^\d{15}|(\d{17}(\d|x|X))$/.test(idCardNo);
       if (!check) return false;
-
       if (idCardNo.length === 15) {
         return check15IdCardNo(idCardNo);
       }
-
       return check18IdCardNo(idCardNo);
     };
-
     return checkIdCardNo(str);
   },
   'zh-HK': function zhHK(str) {
     // sanitize user input
-    str = str.trim(); // HKID number starts with 1 or 2 letters, followed by 6 digits,
+    str = str.trim();
+
+    // HKID number starts with 1 or 2 letters, followed by 6 digits,
     // then a checksum contained in square / round brackets or nothing
-
     var regexHKID = /^[A-Z]{1,2}[0-9]{6}((\([0-9A]\))|(\[[0-9A]\])|([0-9A]))$/;
-    var regexIsDigit = /^[0-9]$/; // convert the user input to all uppercase and apply regex
+    var regexIsDigit = /^[0-9]$/;
 
+    // convert the user input to all uppercase and apply regex
     str = str.toUpperCase();
     if (!regexHKID.test(str)) return false;
     str = str.replace(/\[|\]|\(|\)/g, '');
     if (str.length === 8) str = "3".concat(str);
     var checkSumVal = 0;
-
     for (var i = 0; i <= 7; i++) {
       var convertedChar = void 0;
       if (!regexIsDigit.test(str[i])) convertedChar = (str[i].charCodeAt(0) - 55) % 11;else convertedChar = str[i];
       checkSumVal += convertedChar * (9 - i);
     }
-
     checkSumVal %= 11;
     var checkSumConverted;
     if (checkSumVal === 0) checkSumConverted = '0';else if (checkSumVal === 1) checkSumConverted = 'A';else checkSumConverted = String(11 - checkSumVal);
@@ -31628,19 +32293,25 @@ var validators = {
         var code = ALPHABET_CODES[number];
         return code % 10 * 9 + Math.floor(code / 10);
       }
-
       if (index === 9) {
         return (10 - sum % 10 - Number(number)) % 10 === 0;
       }
-
       return sum + Number(number) * (9 - index);
     }, 0);
+  },
+  PK: function PK(str) {
+    // Pakistani National Identity Number CNIC is 13 digits
+    var CNIC = /^[1-7][0-9]{4}-[0-9]{7}-[1-9]$/;
+
+    // sanitize user input
+    var sanitized = str.trim();
+
+    // validate the data structure
+    return CNIC.test(sanitized);
   }
 };
-
 function isIdentityCard(str, locale) {
   (0, _assertString.default)(str);
-
   if (locale in validators) {
     return validators[locale](str);
   } else if (locale === 'any') {
@@ -31649,19 +32320,15 @@ function isIdentityCard(str, locale) {
       // istanbul ignore else
       if (validators.hasOwnProperty(key)) {
         var validator = validators[key];
-
         if (validator(str)) {
           return true;
         }
       }
     }
-
     return false;
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31677,22 +32344,15 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isIn;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _toString = _interopRequireDefault(__nccwpck_require__(6451));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function isIn(str, options) {
   (0, _assertString.default)(str);
   var i;
-
   if (Object.prototype.toString.call(options) === '[object Array]') {
     var array = [];
-
     for (i in options) {
       // https://github.com/gotwarlost/istanbul/blob/master/ignoring-code-for-coverage.md#ignoring-code-for-coverage-purposes
       // istanbul ignore else
@@ -31700,17 +32360,14 @@ function isIn(str, options) {
         array[i] = (0, _toString.default)(options[i]);
       }
     }
-
     return array.indexOf(str) >= 0;
   } else if (_typeof(options) === 'object') {
     return options.hasOwnProperty(str);
   } else if (options && typeof options.indexOf === 'function') {
     return options.indexOf(str) >= 0;
   }
-
   return false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31726,28 +32383,26 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isInt;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _nullUndefinedCheck = _interopRequireDefault(__nccwpck_require__(2404));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var int = /^(?:[-+]?(?:0|[1-9][0-9]*))$/;
 var intLeadingZeroes = /^[-+]?[0-9]+$/;
-
 function isInt(str, options) {
   (0, _assertString.default)(str);
-  options = options || {}; // Get the regex to use for testing, based on whether
+  options = options || {};
+
+  // Get the regex to use for testing, based on whether
   // leading zeroes are allowed or not.
+  var regex = options.allow_leading_zeroes === false ? int : intLeadingZeroes;
 
-  var regex = options.hasOwnProperty('allow_leading_zeroes') && !options.allow_leading_zeroes ? int : intLeadingZeroes; // Check min/max/lt/gt
-
-  var minCheckPassed = !options.hasOwnProperty('min') || str >= options.min;
-  var maxCheckPassed = !options.hasOwnProperty('max') || str <= options.max;
-  var ltCheckPassed = !options.hasOwnProperty('lt') || str < options.lt;
-  var gtCheckPassed = !options.hasOwnProperty('gt') || str > options.gt;
+  // Check min/max/lt/gt
+  var minCheckPassed = !options.hasOwnProperty('min') || (0, _nullUndefinedCheck.default)(options.min) || str >= options.min;
+  var maxCheckPassed = !options.hasOwnProperty('max') || (0, _nullUndefinedCheck.default)(options.max) || str <= options.max;
+  var ltCheckPassed = !options.hasOwnProperty('lt') || (0, _nullUndefinedCheck.default)(options.lt) || str < options.lt;
+  var gtCheckPassed = !options.hasOwnProperty('gt') || (0, _nullUndefinedCheck.default)(options.gt) || str > options.gt;
   return regex.test(str) && minCheckPassed && maxCheckPassed && ltCheckPassed && gtCheckPassed;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31763,39 +32418,33 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isJSON;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
+var _includesArray = _interopRequireDefault(__nccwpck_require__(2776));
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 var default_json_options = {
-  allow_primitives: false
+  allow_primitives: false,
+  allow_any_value: false
 };
-
 function isJSON(str, options) {
   (0, _assertString.default)(str);
-
   try {
     options = (0, _merge.default)(options, default_json_options);
-    var primitives = [];
+    var obj = JSON.parse(str);
 
+    // When allow_any_value is true, accept anything that JSON.parse successfully parses
+    if (options.allow_any_value) {
+      return true;
+    }
+    var primitives = [];
     if (options.allow_primitives) {
       primitives = [null, false, true];
     }
-
-    var obj = JSON.parse(str);
-    return primitives.includes(obj) || !!obj && _typeof(obj) === 'object';
-  } catch (e) {
-    /* ignore */
-  }
-
+    return (0, _includesArray.default)(primitives, obj) || !!obj && _typeof(obj) === 'object';
+  } catch (e) {/* ignore */}
   return false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31811,29 +32460,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isJWT;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isBase = _interopRequireDefault(__nccwpck_require__(7003));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isJWT(str) {
   (0, _assertString.default)(str);
   var dotSplit = str.split('.');
   var len = dotSplit.length;
-
-  if (len > 3 || len < 2) {
+  if (len !== 3) {
     return false;
   }
-
   return dotSplit.reduce(function (acc, currElem) {
     return acc && (0, _isBase.default)(currElem, {
       urlSafe: true
     });
   }, true);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31849,13 +32491,10 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLatLong;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+var _includesString = _interopRequireDefault(__nccwpck_require__(7817));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var lat = /^\(?[+-]?(90(\.0+)?|[1-8]?\d(\.\d+)?)$/;
 var long = /^\s?[+-]?(180(\.0+)?|1[0-7]\d(\.\d+)?|\d{1,2}(\.\d+)?)\)?$/;
 var latDMS = /^(([1-8]?\d)\D+([1-5]?\d|60)\D+([1-5]?\d|60)(\.\d+)?|90\D+0\D+0)\D+[NSns]?$/i;
@@ -31863,21 +32502,17 @@ var longDMS = /^\s*([1-7]?\d{1,2}\D+([1-5]?\d|60)\D+([1-5]?\d|60)(\.\d+)?|180\D+
 var defaultLatLongOptions = {
   checkDMS: false
 };
-
 function isLatLong(str, options) {
   (0, _assertString.default)(str);
   options = (0, _merge.default)(options, defaultLatLongOptions);
-  if (!str.includes(',')) return false;
+  if (!(0, _includesString.default)(str, ',')) return false;
   var pair = str.split(',');
   if (pair[0].startsWith('(') && !pair[1].endsWith(')') || pair[1].endsWith(')') && !pair[0].startsWith('(')) return false;
-
   if (options.checkDMS) {
     return latDMS.test(pair[0]) && longDMS.test(pair[1]);
   }
-
   return lat.test(pair[0]) && long.test(pair[1]);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31893,19 +32528,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLength;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 /* eslint-disable prefer-rest-params */
 function isLength(str, options) {
   (0, _assertString.default)(str);
   var min;
   var max;
-
   if (_typeof(options) === 'object') {
     min = options.min || 0;
     max = options.max;
@@ -31914,13 +32544,17 @@ function isLength(str, options) {
     min = arguments[1] || 0;
     max = arguments[2];
   }
-
-  var presentationSequences = str.match(/(\uFE0F|\uFE0E)/g) || [];
+  var presentationSequences = str.match(/[^\uFE0F\uFE0E][\uFE0F\uFE0E]/g) || [];
   var surrogatePairs = str.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g) || [];
   var len = str.length - presentationSequences.length - surrogatePairs.length;
-  return len >= min && (typeof max === 'undefined' || len <= max);
+  var isInsideRange = len >= min && (typeof max === 'undefined' || len <= max);
+  if (isInsideRange && Array.isArray(options === null || options === void 0 ? void 0 : options.discreteLengths)) {
+    return options.discreteLengths.some(function (discreteLen) {
+      return discreteLen === len;
+    });
+  }
+  return isInsideRange;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -31936,11 +32570,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLicensePlate;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var validators = {
   'cs-CZ': function csCZ(str) {
     return /^(([ABCDEFHIJKLMNPRSTUVXYZ]|[0-9])-?){5,8}$/.test(str);
@@ -31953,6 +32584,9 @@ var validators = {
   },
   'en-IN': function enIN(str) {
     return /^[A-Z]{2}[ -]?[0-9]{1,2}(?:[ -]?[A-Z])(?:[ -]?[A-Z]*)?[ -]?[0-9]{4}$/.test(str);
+  },
+  'en-SG': function enSG(str) {
+    return /^[A-Z]{3}[ -]?[\d]{4}[ -]?[A-Z]{1}$/.test(str);
   },
   'es-AR': function esAR(str) {
     return /^(([A-Z]{2} ?[0-9]{3} ?[A-Z]{2})|([A-Z]{3} ?[0-9]{3}))$/.test(str);
@@ -31967,37 +32601,34 @@ var validators = {
     return /^[A-Z]{3}[ -]?[0-9][A-Z][0-9]{2}|[A-Z]{3}[ -]?[0-9]{4}$/.test(str);
   },
   'pt-PT': function ptPT(str) {
-    return /^([A-Z]{2}|[0-9]{2})[ -·]?([A-Z]{2}|[0-9]{2})[ -·]?([A-Z]{2}|[0-9]{2})$/.test(str);
+    return /^(([A-Z]{2}[ -·]?[0-9]{2}[ -·]?[0-9]{2})|([0-9]{2}[ -·]?[A-Z]{2}[ -·]?[0-9]{2})|([0-9]{2}[ -·]?[0-9]{2}[ -·]?[A-Z]{2})|([A-Z]{2}[ -·]?[0-9]{2}[ -·]?[A-Z]{2}))$/.test(str);
   },
   'sq-AL': function sqAL(str) {
     return /^[A-Z]{2}[- ]?((\d{3}[- ]?(([A-Z]{2})|T))|(R[- ]?\d{3}))$/.test(str);
   },
   'sv-SE': function svSE(str) {
     return /^[A-HJ-PR-UW-Z]{3} ?[\d]{2}[A-HJ-PR-UW-Z1-9]$|(^[A-ZÅÄÖ ]{2,7}$)/.test(str.trim());
+  },
+  'en-PK': function enPK(str) {
+    return /(^[A-Z]{2}((\s|-){0,1})[0-9]{3,4}((\s|-)[0-9]{2}){0,1}$)|(^[A-Z]{3}((\s|-){0,1})[0-9]{3,4}((\s|-)[0-9]{2}){0,1}$)|(^[A-Z]{4}((\s|-){0,1})[0-9]{3,4}((\s|-)[0-9]{2}){0,1}$)|(^[A-Z]((\s|-){0,1})[0-9]{4}((\s|-)[0-9]{2}){0,1}$)/.test(str.trim());
   }
 };
-
 function isLicensePlate(str, locale) {
   (0, _assertString.default)(str);
-
   if (locale in validators) {
     return validators[locale](str);
   } else if (locale === 'any') {
     for (var key in validators) {
       /* eslint guard-for-in: 0 */
       var validator = validators[key];
-
       if (validator(str)) {
         return true;
       }
     }
-
     return false;
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32013,23 +32644,113 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLocale;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+/*
+  = 3ALPHA              ; selected ISO 639 codes
+    *2("-" 3ALPHA)      ; permanently reserved
+ */
+var extlang = '([A-Za-z]{3}(-[A-Za-z]{3}){0,2})';
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+/*
+  = 2*3ALPHA            ; shortest ISO 639 code
+    ["-" extlang]       ; sometimes followed by
+                        ; extended language subtags
+  / 4ALPHA              ; or reserved for future use
+  / 5*8ALPHA            ; or registered language subtag
+ */
+var language = "(([a-zA-Z]{2,3}(-".concat(extlang, ")?)|([a-zA-Z]{5,8}))");
 
-var localeReg = /^[A-Za-z]{2,4}([_-]([A-Za-z]{4}|[\d]{3}))?([_-]([A-Za-z]{2}|[\d]{3}))?$/;
+/*
+  = 4ALPHA              ; ISO 15924 code
+ */
+var script = '([A-Za-z]{4})';
 
+/*
+  = 2ALPHA              ; ISO 3166-1 code
+  / 3DIGIT              ; UN M.49 code
+ */
+var region = '([A-Za-z]{2}|\\d{3})';
+
+/*
+  = 5*8alphanum         ; registered variants
+  / (DIGIT 3alphanum)
+ */
+var variant = '([A-Za-z0-9]{5,8}|(\\d[A-Z-a-z0-9]{3}))';
+
+/*
+  = DIGIT               ; 0 - 9
+  / %x41-57             ; A - W
+  / %x59-5A             ; Y - Z
+  / %x61-77             ; a - w
+  / %x79-7A             ; y - z
+ */
+var singleton = '(\\d|[A-W]|[Y-Z]|[a-w]|[y-z])';
+
+/*
+  = singleton 1*("-" (2*8alphanum))
+                        ; Single alphanumerics
+                        ; "x" reserved for private use
+ */
+var extension = "(".concat(singleton, "(-[A-Za-z0-9]{2,8})+)");
+
+/*
+  = "x" 1*("-" (1*8alphanum))
+ */
+var privateuse = '(x(-[A-Za-z0-9]{1,8})+)';
+
+// irregular tags do not match the 'langtag' production and would not
+// otherwise be considered 'well-formed'. These tags are all valid, but
+// most are deprecated in favor of more modern subtags or subtag combination
+
+var irregular = '((en-GB-oed)|(i-ami)|(i-bnn)|(i-default)|(i-enochian)|' + '(i-hak)|(i-klingon)|(i-lux)|(i-mingo)|(i-navajo)|(i-pwn)|(i-tao)|' + '(i-tay)|(i-tsu)|(sgn-BE-FR)|(sgn-BE-NL)|(sgn-CH-DE))';
+
+// regular tags match the 'langtag' production, but their subtags are not
+// extended language or variant subtags: their meaning is defined by
+// their registration and all of these are deprecated in favor of a more
+// modern subtag or sequence of subtags
+
+var regular = '((art-lojban)|(cel-gaulish)|(no-bok)|(no-nyn)|(zh-guoyu)|' + '(zh-hakka)|(zh-min)|(zh-min-nan)|(zh-xiang))';
+
+/*
+  = irregular           ; non-redundant tags registered
+  / regular             ; during the RFC 3066 era
+
+ */
+var grandfathered = "(".concat(irregular, "|").concat(regular, ")");
+
+/*
+  RFC 5646 defines delimitation of subtags via a hyphen:
+
+      "Subtag" refers to a specific section of a tag, delimited by a
+      hyphen, such as the subtags 'zh', 'Hant', and 'CN' in the tag "zh-
+      Hant-CN".  Examples of subtags in this document are enclosed in
+      single quotes ('Hant')
+
+  However, we need to add "_" to maintain the existing behaviour.
+ */
+var delimiter = '(-|_)';
+
+/*
+  = language
+    ["-" script]
+    ["-" region]
+    *("-" variant)
+    *("-" extension)
+    ["-" privateuse]
+ */
+var langtag = "".concat(language, "(").concat(delimiter).concat(script, ")?(").concat(delimiter).concat(region, ")?(").concat(delimiter).concat(variant, ")*(").concat(delimiter).concat(extension, ")*(").concat(delimiter).concat(privateuse, ")?");
+
+/*
+  Regex implementation based on BCP RFC 5646
+  Tags for Identifying Languages
+  https://www.rfc-editor.org/rfc/rfc5646.html
+ */
+var languageTagRegex = new RegExp("(^".concat(privateuse, "$)|(^").concat(grandfathered, "$)|(^").concat(langtag, "$)"));
 function isLocale(str) {
   (0, _assertString.default)(str);
-
-  if (str === 'en_US_POSIX' || str === 'ca_ES_VALENCIA') {
-    return true;
-  }
-
-  return localeReg.test(str);
+  return languageTagRegex.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32045,16 +32766,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLowercase;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isLowercase(str) {
   (0, _assertString.default)(str);
   return str === str.toLowerCase();
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32070,11 +32787,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isLuhnNumber;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isLuhnNumber(str) {
   (0, _assertString.default)(str);
   var sanitized = str.replace(/[- ]+/g, '');
@@ -32082,14 +32796,11 @@ function isLuhnNumber(str) {
   var digit;
   var tmpNum;
   var shouldDouble;
-
   for (var i = sanitized.length - 1; i >= 0; i--) {
     digit = sanitized.substring(i, i + 1);
     tmpNum = parseInt(digit, 10);
-
     if (shouldDouble) {
       tmpNum *= 2;
-
       if (tmpNum >= 10) {
         sum += tmpNum % 10 + 1;
       } else {
@@ -32098,13 +32809,10 @@ function isLuhnNumber(str) {
     } else {
       sum += tmpNum;
     }
-
     shouldDouble = !shouldDouble;
   }
-
   return !!(sum % 10 === 0 ? sanitized : false);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32120,56 +32828,43 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMACAddress;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var macAddress48 = /^(?:[0-9a-fA-F]{2}([-:\s]))([0-9a-fA-F]{2}\1){4}([0-9a-fA-F]{2})$/;
 var macAddress48NoSeparators = /^([0-9a-fA-F]){12}$/;
 var macAddress48WithDots = /^([0-9a-fA-F]{4}\.){2}([0-9a-fA-F]{4})$/;
 var macAddress64 = /^(?:[0-9a-fA-F]{2}([-:\s]))([0-9a-fA-F]{2}\1){6}([0-9a-fA-F]{2})$/;
 var macAddress64NoSeparators = /^([0-9a-fA-F]){16}$/;
 var macAddress64WithDots = /^([0-9a-fA-F]{4}\.){3}([0-9a-fA-F]{4})$/;
-
 function isMACAddress(str, options) {
   (0, _assertString.default)(str);
-
   if (options !== null && options !== void 0 && options.eui) {
     options.eui = String(options.eui);
   }
   /**
    * @deprecated `no_colons` TODO: remove it in the next major
   */
-
-
   if (options !== null && options !== void 0 && options.no_colons || options !== null && options !== void 0 && options.no_separators) {
     if (options.eui === '48') {
       return macAddress48NoSeparators.test(str);
     }
-
     if (options.eui === '64') {
       return macAddress64NoSeparators.test(str);
     }
-
     return macAddress48NoSeparators.test(str) || macAddress64NoSeparators.test(str);
   }
-
   if ((options === null || options === void 0 ? void 0 : options.eui) === '48') {
     return macAddress48.test(str) || macAddress48WithDots.test(str);
   }
-
   if ((options === null || options === void 0 ? void 0 : options.eui) === '64') {
     return macAddress64.test(str) || macAddress64WithDots.test(str);
   }
-
   return isMACAddress(str, {
     eui: '48'
   }) || isMACAddress(str, {
     eui: '64'
   });
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32185,18 +32880,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMD5;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var md5 = /^[a-f0-9]{32}$/;
-
 function isMD5(str) {
   (0, _assertString.default)(str);
   return md5.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32212,23 +32902,107 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMagnetURI;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var magnetURIComponent = /(?:^magnet:\?|[^?&]&)xt(?:\.1)?=urn:(?:(?:aich|bitprint|btih|ed2k|ed2khash|kzhash|md5|sha1|tree:tiger):[a-z0-9]{32}(?:[a-z0-9]{8})?|btmh:1220[a-z0-9]{64})(?:$|&)/i;
-
 function isMagnetURI(url) {
   (0, _assertString.default)(url);
-
   if (url.indexOf('magnet:?') !== 0) {
     return false;
   }
-
   return magnetURIComponent.test(url);
 }
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
+/***/ }),
+
+/***/ 4149:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = isMailtoURI;
+var _trim = _interopRequireDefault(__nccwpck_require__(3495));
+var _isEmail = _interopRequireDefault(__nccwpck_require__(1324));
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function parseMailtoQueryString(queryString) {
+  var allowedParams = new Set(['subject', 'body', 'cc', 'bcc']),
+    query = {
+      cc: '',
+      bcc: ''
+    };
+  var isParseFailed = false;
+  var queryParams = queryString.split('&');
+  if (queryParams.length > 4) {
+    return false;
+  }
+  var _iterator = _createForOfIteratorHelper(queryParams),
+    _step;
+  try {
+    for (_iterator.s(); !(_step = _iterator.n()).done;) {
+      var q = _step.value;
+      var _q$split = q.split('='),
+        _q$split2 = _slicedToArray(_q$split, 2),
+        key = _q$split2[0],
+        value = _q$split2[1];
+
+      // checked for invalid and duplicated query params
+      if (key && !allowedParams.has(key)) {
+        isParseFailed = true;
+        break;
+      }
+      if (value && (key === 'cc' || key === 'bcc')) {
+        query[key] = value;
+      }
+      if (key) {
+        allowedParams.delete(key);
+      }
+    }
+  } catch (err) {
+    _iterator.e(err);
+  } finally {
+    _iterator.f();
+  }
+  return isParseFailed ? false : query;
+}
+function isMailtoURI(url, options) {
+  (0, _assertString.default)(url);
+  if (url.indexOf('mailto:') !== 0) {
+    return false;
+  }
+  var _url$replace$split = url.replace('mailto:', '').split('?'),
+    _url$replace$split2 = _slicedToArray(_url$replace$split, 2),
+    to = _url$replace$split2[0],
+    _url$replace$split2$ = _url$replace$split2[1],
+    queryString = _url$replace$split2$ === void 0 ? '' : _url$replace$split2$;
+  if (!to && !queryString) {
+    return true;
+  }
+  var query = parseMailtoQueryString(queryString);
+  if (!query) {
+    return false;
+  }
+  return "".concat(to, ",").concat(query.cc, ",").concat(query.bcc).split(',').every(function (email) {
+    email = (0, _trim.default)(email, ' ');
+    if (email) {
+      return (0, _isEmail.default)(email, options);
+    }
+    return true;
+  });
+}
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32244,49 +33018,46 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMimeType;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /*
   Checks if the provided string matches to a correct Media type format (MIME type)
 
   This function only checks is the string format follows the
-  etablished rules by the according RFC specifications.
+  established rules by the according RFC specifications.
   This function supports 'charset' in textual media types
   (https://tools.ietf.org/html/rfc6657).
 
   This function does not check against all the media types listed
   by the IANA (https://www.iana.org/assignments/media-types/media-types.xhtml)
   because of lightness purposes : it would require to include
-  all these MIME types in this librairy, which would weigh it
+  all these MIME types in this library, which would weigh it
   significantly. This kind of effort maybe is not worth for the use that
-  this function has in this entire librairy.
+  this function has in this entire library.
 
-  More informations in the RFC specifications :
+  More information in the RFC specifications :
   - https://tools.ietf.org/html/rfc2045
   - https://tools.ietf.org/html/rfc2046
   - https://tools.ietf.org/html/rfc7231#section-3.1.1.1
   - https://tools.ietf.org/html/rfc7231#section-3.1.1.5
 */
+
 // Match simple MIME types
 // NB :
 //   Subtype length must not exceed 100 characters.
 //   This rule does not comply to the RFC specs (what is the max length ?).
 var mimeTypeSimple = /^(application|audio|font|image|message|model|multipart|text|video)\/[a-zA-Z0-9\.\-\+_]{1,100}$/i; // eslint-disable-line max-len
+
 // Handle "charset" in "text/*"
-
 var mimeTypeText = /^text\/[a-zA-Z0-9\.\-\+]{1,100};\s?charset=("[a-zA-Z0-9\.\-\+\s]{0,70}"|[a-zA-Z0-9\.\-\+]{0,70})(\s?\([a-zA-Z0-9\.\-\+\s]{1,20}\))?$/i; // eslint-disable-line max-len
-// Handle "boundary" in "multipart/*"
 
+// Handle "boundary" in "multipart/*"
 var mimeTypeMultipart = /^multipart\/[a-zA-Z0-9\.\-\+]{1,100}(;\s?(boundary|charset)=("[a-zA-Z0-9\.\-\+\s]{0,70}"|[a-zA-Z0-9\.\-\+]{0,70})(\s?\([a-zA-Z0-9\.\-\+\s]{1,20}\))?){0,2}$/i; // eslint-disable-line max-len
 
 function isMimeType(str) {
   (0, _assertString.default)(str);
   return mimeTypeSimple.test(str) || mimeTypeText.test(str) || mimeTypeMultipart.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32303,14 +33074,11 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isMobilePhone;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /* eslint-disable max-len */
 var phones = {
-  'am-AM': /^(\+?374|0)((10|[9|7][0-9])\d{6}$|[2-4]\d{7}$)/,
+  'am-AM': /^(\+?374|0)(33|4[134]|55|77|88|9[13-689])\d{6}$/,
   'ar-AE': /^((\+?971)|0)?5[024568]\d{7}$/,
   'ar-BH': /^(\+?973)?(3|6)\d{7}$/,
   'ar-DZ': /^(\+?213|0)(5|6|7)\d{8}$/,
@@ -32321,12 +33089,14 @@ var phones = {
   'ar-KW': /^(\+?965)([569]\d{7}|41\d{6})$/,
   'ar-LY': /^((\+?218)|0)?(9[1-6]\d{7}|[1-8]\d{7,9})$/,
   'ar-MA': /^(?:(?:\+|00)212|0)[5-7]\d{8}$/,
-  'ar-OM': /^((\+|00)968)?(9[1-9])\d{6}$/,
+  'ar-OM': /^((\+|00)968)?([79][1-9])\d{6}$/,
   'ar-PS': /^(\+?970|0)5[6|9](\d{7})$/,
   'ar-SA': /^(!?(\+?966)|0)?5\d{8}$/,
+  'ar-SD': /^((\+?249)|0)?(9[012369]|1[012])\d{7}$/,
   'ar-SY': /^(!?(\+?963)|0)?9\d{8}$/,
   'ar-TN': /^(\+?216)?[2459]\d{7}$/,
   'az-AZ': /^(\+994|0)(10|5[015]|7[07]|99)\d{7}$/,
+  'ar-QA': /^(\+?974|0)?([3567]\d{7})$/,
   'bs-BA': /^((((\+|00)3876)|06))((([0-3]|[5-6])\d{6})|(4\d{7}))$/,
   'be-BY': /^(\+?375)?(24|25|29|33|44)\d{7}$/,
   'bg-BG': /^(\+?359|0)?8[789]\d{7}$/,
@@ -32340,15 +33110,15 @@ var phones = {
   'de-LU': /^(\+352)?((6\d1)\d{6})$/,
   'dv-MV': /^(\+?960)?(7[2-9]|9[1-9])\d{5}$/,
   'el-GR': /^(\+?30|0)?6(8[5-9]|9(?![26])[0-9])\d{7}$/,
-  'el-CY': /^(\+?357?)?(9(9|6)\d{6})$/,
+  'el-CY': /^(\+?357?)?(9(9|7|6|5|4)\d{6})$/,
   'en-AI': /^(\+?1|0)264(?:2(35|92)|4(?:6[1-2]|76|97)|5(?:3[6-9]|8[1-4])|7(?:2(4|9)|72))\d{4}$/,
   'en-AU': /^(\+?61|0)4\d{8}$/,
   'en-AG': /^(?:\+1|1)268(?:464|7(?:1[3-9]|[28]\d|3[0246]|64|7[0-689]))\d{4}$/,
   'en-BM': /^(\+?1)?441(((3|7)\d{6}$)|(5[0-3][0-9]\d{4}$)|(59\d{5}$))/,
   'en-BS': /^(\+?1[-\s]?|0)?\(?242\)?[-\s]?\d{3}[-\s]?\d{4}$/,
-  'en-GB': /^(\+?44|0)7\d{9}$/,
+  'en-GB': /^(\+?44|0)7[1-9]\d{8}$/,
   'en-GG': /^(\+?44|0)1481\d{6}$/,
-  'en-GH': /^(\+233|0)(20|50|24|54|27|57|26|56|23|28|55|59)\d{7}$/,
+  'en-GH': /^(\+233|0)(20|50|24|54|27|57|26|56|23|53|28|55|59)\d{7}$/,
   'en-GY': /^(\+592|0)6\d{6}$/,
   'en-HK': /^(\+?852[-\s]?)?[456789]\d{3}[-\s]?\d{4}$/,
   'en-MO': /^(\+?853[-\s]?)?[6]\d{3}[-\s]?\d{4}$/,
@@ -32356,12 +33126,14 @@ var phones = {
   'en-IN': /^(\+?91|0)?[6789]\d{9}$/,
   'en-JM': /^(\+?876)?\d{7}$/,
   'en-KE': /^(\+?254|0)(7|1)\d{8}$/,
+  'fr-CF': /^(\+?236| ?)(70|75|77|72|21|22)\d{6}$/,
   'en-SS': /^(\+?211|0)(9[1257])\d{7}$/,
   'en-KI': /^((\+686|686)?)?( )?((6|7)(2|3|8)[0-9]{6})$/,
   'en-KN': /^(?:\+1|1)869(?:46\d|48[89]|55[6-8]|66\d|76[02-7])\d{4}$/,
   'en-LS': /^(\+?266)(22|28|57|58|59|27|52)\d{6}$/,
   'en-MT': /^(\+?356|0)?(99|79|77|21|27|22|25)[0-9]{6}$/,
   'en-MU': /^(\+?230|0)?\d{8}$/,
+  'en-MW': /^(\+?265|0)(((77|88|31|99|98|21)\d{7})|(((111)|1)\d{6})|(32000\d{4}))$/,
   'en-NA': /^(\+?264|0)(6|8)\d{7}$/,
   'en-NG': /^(\+?234|0)?[789]\d{9}$/,
   'en-NZ': /^(\+?64|0)[28]\d{7,9}$/,
@@ -32375,7 +33147,7 @@ var phones = {
   'en-UG': /^(\+?256|0)?[7]\d{8}$/,
   'en-US': /^((\+1|1)?( |-)?)?(\([2-9][0-9]{2}\)|[2-9][0-9]{2})( |-)?([2-9][0-9]{2}( |-)?[0-9]{4})$/,
   'en-ZA': /^(\+?27|0)\d{9}$/,
-  'en-ZM': /^(\+?26)?09[567]\d{7}$/,
+  'en-ZM': /^(\+?26)?0[79][567]\d{7}$/,
   'en-ZW': /^(\+263)[0-9]{9}$/,
   'en-BW': /^(\+?267)?(7[1-8]{1})\d{6}$/,
   'es-AR': /^\+?549(11|[2368]\d)\d{8}$/,
@@ -32383,11 +33155,12 @@ var phones = {
   'es-CO': /^(\+?57)?3(0(0|1|2|4|5)|1\d|2[0-4]|5(0|1))\d{7}$/,
   'es-CL': /^(\+?56|0)[2-9]\d{1}\d{7}$/,
   'es-CR': /^(\+506)?[2-8]\d{7}$/,
-  'es-CU': /^(\+53|0053)?5\d{7}/,
+  'es-CU': /^(\+53|0053)?5\d{7}$/,
   'es-DO': /^(\+?1)?8[024]9\d{7}$/,
   'es-HN': /^(\+?504)?[9|8|3|2]\d{7}$/,
   'es-EC': /^(\+?593|0)([2-7]|9[2-9])\d{7}$/,
   'es-ES': /^(\+?34)?[6|7]\d{8}$/,
+  'es-GT': /^(\+?502)?[2|6|7]\d{7}$/,
   'es-PE': /^(\+?51)?9\d{8}$/,
   'es-MX': /^(\+?52)?(1|01)?\d{10,11}$/,
   'es-NI': /^(\+?505)\d{7,8}$/,
@@ -32405,12 +33178,14 @@ var phones = {
   'fr-BJ': /^(\+229)\d{8}$/,
   'fr-CD': /^(\+?243|0)?(8|9)\d{8}$/,
   'fr-CM': /^(\+?237)6[0-9]{8}$/,
+  'fr-DJ': /^(?:\+253)?77[6-8]\d{5}$/,
   'fr-FR': /^(\+?33|0)[67]\d{8}$/,
   'fr-GF': /^(\+?594|0|00594)[67]\d{8}$/,
   'fr-GP': /^(\+?590|0|00590)[67]\d{8}$/,
   'fr-MQ': /^(\+?596|0|00596)[67]\d{8}$/,
   'fr-PF': /^(\+?689)?8[789]\d{6}$/,
   'fr-RE': /^(\+?262|0|00262)[67]\d{8}$/,
+  'fr-WF': /^(\+681)?\d{6}$/,
   'he-IL': /^(\+972|0)([23489]|5[012345689]|77)[1-9]\d{6}$/,
   'hu-HU': /^(\+?36|06)(20|30|31|50|70)\d{7}$/,
   'id-ID': /^(\+?62|0)8(1[123456789]|2[1238]|3[1238]|5[12356789]|7[78]|9[56789]|8[123456789])([\s?|\d]{5,11})$/,
@@ -32422,7 +33197,7 @@ var phones = {
   'kk-KZ': /^(\+?7|8)?7\d{9}$/,
   'kl-GL': /^(\+?299)?\s?\d{2}\s?\d{2}\s?\d{2}$/,
   'ko-KR': /^((\+?82)[ \-]?)?0?1([0|1|6|7|8|9]{1})[ \-]?\d{3,4}[ \-]?\d{4}$/,
-  'ky-KG': /^(\+?7\s?\+?7|0)\s?\d{2}\s?\d{3}\s?\d{4}$/,
+  'ky-KG': /^(\+996\s?)?(22[0-9]|50[0-9]|55[0-9]|70[0-9]|75[0-9]|77[0-9]|880|990|995|996|997|998)\s?\d{3}\s?\d{3}$/,
   'lt-LT': /^(\+370|8)\d{8}$/,
   'lv-LV': /^(\+?371)2\d{7}$/,
   'mg-MG': /^((\+?261|0)(2|3)\d)?\d{7}$/,
@@ -32436,24 +33211,25 @@ var phones = {
   'nl-NL': /^(((\+|00)?31\(0\))|((\+|00)?31)|0)6{1}\d{8}$/,
   'nl-AW': /^(\+)?297(56|59|64|73|74|99)\d{5}$/,
   'nn-NO': /^(\+?47)?[49]\d{7}$/,
-  'pl-PL': /^(\+?48)? ?[5-8]\d ?\d{3} ?\d{2} ?\d{2}$/,
+  'pl-PL': /^(\+?48)? ?([5-8]\d|45) ?\d{3} ?\d{2} ?\d{2}$/,
   'pt-BR': /^((\+?55\ ?[1-9]{2}\ ?)|(\+?55\ ?\([1-9]{2}\)\ ?)|(0[1-9]{2}\ ?)|(\([1-9]{2}\)\ ?)|([1-9]{2}\ ?))((\d{4}\-?\d{4})|(9[1-9]{1}\d{3}\-?\d{4}))$/,
   'pt-PT': /^(\+?351)?9[1236]\d{7}$/,
-  'pt-AO': /^(\+244)\d{9}$/,
+  'pt-AO': /^(\+?244)?9\d{8}$/,
   'ro-MD': /^(\+?373|0)((6(0|1|2|6|7|8|9))|(7(6|7|8|9)))\d{6}$/,
   'ro-RO': /^(\+?40|0)\s?7\d{2}(\/|\s|\.|-)?\d{3}(\s|\.|-)?\d{3}$/,
   'ru-RU': /^(\+?7|8)?9\d{9}$/,
   'si-LK': /^(?:0|94|\+94)?(7(0|1|2|4|5|6|7|8)( |-)?)\d{7}$/,
   'sl-SI': /^(\+386\s?|0)(\d{1}\s?\d{3}\s?\d{2}\s?\d{2}|\d{2}\s?\d{3}\s?\d{3})$/,
   'sk-SK': /^(\+?421)? ?[1-9][0-9]{2} ?[0-9]{3} ?[0-9]{3}$/,
-  'sq-AL': /^(\+355|0)6[789]\d{6}$/,
+  'so-SO': /^(\+?252|0)((6[0-9])\d{7}|(7[1-9])\d{7})$/,
+  'sq-AL': /^(\+355|0)6[2-9]\d{7}$/,
   'sr-RS': /^(\+3816|06)[- \d]{5,9}$/,
   'sv-SE': /^(\+?46|0)[\s\-]?7[\s\-]?[02369]([\s\-]?\d){7}$/,
   'tg-TJ': /^(\+?992)?[5][5]\d{7}$/,
   'th-TH': /^(\+66|66|0)\d{9}$/,
   'tr-TR': /^(\+?90|0)?5\d{9}$/,
   'tk-TM': /^(\+993|993|8)\d{8}$/,
-  'uk-UA': /^(\+?38|8)?0\d{9}$/,
+  'uk-UA': /^(\+?38)?0(50|6[36-8]|7[357]|9[1-9])\d{7}$/,
   'uz-UZ': /^(\+?998)?(6[125-79]|7[1-69]|88|9\d)\d{7}$/,
   'vi-VN': /^((\+?84)|0)((3([2-9]))|(5([25689]))|(7([0|6-9]))|(8([1-9]))|(9([0-9])))([0-9]{7})$/,
   'zh-CN': /^((\+|00)86)?(1[3-9]|9[28])\d{9}$/,
@@ -32461,11 +33237,12 @@ var phones = {
   'dz-BT': /^(\+?975|0)?(17|16|77|02)\d{6}$/,
   'ar-YE': /^(((\+|00)9677|0?7)[0137]\d{7}|((\+|00)967|0)[1-7]\d{6})$/,
   'ar-EH': /^(\+?212|0)[\s\-]?(5288|5289)[\s\-]?\d{5}$/,
-  'fa-AF': /^(\+93|0)?(2{1}[0-8]{1}|[3-5]{1}[0-4]{1})(\d{7})$/
+  'fa-AF': /^(\+93|0)?(2{1}[0-8]{1}|[3-5]{1}[0-4]{1})(\d{7})$/,
+  'mk-MK': /^(\+?389|0)?((?:2[2-9]\d{6}|(?:3[1-4]|4[2-8])\d{6}|500\d{5}|5[2-9]\d{6}|7[0-9][2-9]\d{5}|8[1-9]\d{6}|800\d{5}|8009\d{4}))$/
 };
 /* eslint-enable max-len */
-// aliases
 
+// aliases
 phones['en-CA'] = phones['en-US'];
 phones['fr-CA'] = phones['en-CA'];
 phones['fr-BE'] = phones['nl-BE'];
@@ -32474,50 +33251,41 @@ phones['zh-MO'] = phones['en-MO'];
 phones['ga-IE'] = phones['en-IE'];
 phones['fr-CH'] = phones['de-CH'];
 phones['it-CH'] = phones['fr-CH'];
-
 function isMobilePhone(str, locale, options) {
   (0, _assertString.default)(str);
-
   if (options && options.strictMode && !str.startsWith('+')) {
     return false;
   }
-
   if (Array.isArray(locale)) {
     return locale.some(function (key) {
       // https://github.com/gotwarlost/istanbul/blob/master/ignoring-code-for-coverage.md#ignoring-code-for-coverage-purposes
       // istanbul ignore else
       if (phones.hasOwnProperty(key)) {
         var phone = phones[key];
-
         if (phone.test(str)) {
           return true;
         }
       }
-
       return false;
     });
   } else if (locale in phones) {
-    return phones[locale].test(str); // alias falsey locale as 'any'
+    return phones[locale].test(str);
+    // alias falsey locale as 'any'
   } else if (!locale || locale === 'any') {
     for (var key in phones) {
       // istanbul ignore else
       if (phones.hasOwnProperty(key)) {
         var phone = phones[key];
-
         if (phone.test(str)) {
           return true;
         }
       }
     }
-
     return false;
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
-var locales = Object.keys(phones);
-exports.locales = locales;
+var locales = exports.locales = Object.keys(phones);
 
 /***/ }),
 
@@ -32531,18 +33299,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMongoId;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isHexadecimal = _interopRequireDefault(__nccwpck_require__(6262));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isMongoId(str) {
   (0, _assertString.default)(str);
   return (0, _isHexadecimal.default)(str) && str.length === 24;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32558,11 +33321,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isMultibyte;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /* eslint-disable no-control-regex */
 var multibyte = /[^\x00-\x7F]/;
 /* eslint-enable no-control-regex */
@@ -32571,7 +33331,6 @@ function isMultibyte(str) {
   (0, _assertString.default)(str);
   return multibyte.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32587,25 +33346,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isNumeric;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _alpha = __nccwpck_require__(2644);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var numericNoSymbols = /^[0-9]+$/;
-
 function isNumeric(str, options) {
   (0, _assertString.default)(str);
-
   if (options && options.no_symbols) {
     return numericNoSymbols.test(str);
   }
-
   return new RegExp("^[+-]?([0-9]*[".concat((options || {}).locale ? _alpha.decimal[options.locale] : '.', "])?[0-9]+$")).test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32621,25 +33372,20 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isOctal;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var octal = /^(0o)?[0-7]+$/i;
-
 function isOctal(str) {
   (0, _assertString.default)(str);
   return octal.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
 /***/ }),
 
 /***/ 33:
-/***/ ((module, exports, __nccwpck_require__) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
@@ -32648,11 +33394,9 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isPassportNumber;
-
+exports.locales = void 0;
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /**
  * Reference:
  * https://en.wikipedia.org/ -- Wikipedia
@@ -32668,7 +33412,7 @@ var passportRegexByCountryCode = {
   // AUSTRIA
   AU: /^[A-Z]\d{7}$/,
   // AUSTRALIA
-  AZ: /^[A-Z]{2,3}\d{7,8}$/,
+  AZ: /^[A-Z]{1}\d{8}$/,
   // AZERBAIJAN
   BE: /^[A-Z]{2}\d{6}$/,
   // BELGIUM
@@ -32678,7 +33422,7 @@ var passportRegexByCountryCode = {
   // BRAZIL
   BY: /^[A-Z]{2}\d{7}$/,
   // BELARUS
-  CA: /^[A-Z]{2}\d{6}$/,
+  CA: /^[A-Z]{2}\d{6}$|^[A-Z]\d{6}[A-Z]{2}$/,
   // CANADA
   CH: /^[A-Z]\d{7}$/,
   // SWITZERLAND
@@ -32746,7 +33490,7 @@ var passportRegexByCountryCode = {
   // MOZAMBIQUE
   MY: /^[AHK]\d{8}$/,
   // MALAYSIA
-  MX: /^\d{10,11}$/,
+  MX: /^[A-Z]\d{8}$/,
   // MEXICO
   NL: /^[A-Z]{2}[A-Z0-9]{6}\d$/,
   // NETHERLANDS
@@ -32776,9 +33520,12 @@ var passportRegexByCountryCode = {
   // TURKEY
   UA: /^[A-Z]{2}\d{6}$/,
   // UKRAINE
-  US: /^\d{9}$/ // UNITED STATES
-
+  US: /^\d{9}$|^[A-Z]\d{8}$/,
+  // UNITED STATES
+  ZA: /^[TAMD]\d{8}$/ // SOUTH AFRICA
 };
+var locales = exports.locales = Object.keys(passportRegexByCountryCode);
+
 /**
  * Check if str is a valid passport number
  * relative to provided ISO Country Code.
@@ -32787,17 +33534,12 @@ var passportRegexByCountryCode = {
  * @param {string} countryCode
  * @return {boolean}
  */
-
 function isPassportNumber(str, countryCode) {
   (0, _assertString.default)(str);
   /** Remove All Whitespaces, Convert to UPPERCASE */
-
   var normalizedStr = str.replace(/\s/g, '').toUpperCase();
   return countryCode.toUpperCase() in passportRegexByCountryCode && passportRegexByCountryCode[countryCode].test(normalizedStr);
 }
-
-module.exports = exports.default;
-module.exports["default"] = exports.default;
 
 /***/ }),
 
@@ -32811,18 +33553,15 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isPort;
-
 var _isInt = _interopRequireDefault(__nccwpck_require__(7205));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isPort(str) {
   return (0, _isInt.default)(str, {
+    allow_leading_zeroes: false,
     min: 0,
     max: 65535
   });
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32839,11 +33578,8 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 exports["default"] = isPostalCode;
 exports.locales = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 // common patterns
 var threeDigit = /^\d{3}$/;
 var fourDigit = /^\d{4}$/;
@@ -32855,13 +33591,15 @@ var patterns = {
   AU: fourDigit,
   AZ: /^AZ\d{4}$/,
   BA: /^([7-8]\d{4}$)/,
+  BD: /^([1-8][0-9]{3}|9[0-4][0-9]{2})$/,
   BE: fourDigit,
   BG: fourDigit,
-  BR: /^\d{5}-\d{3}$/,
+  BR: /^\d{5}-?\d{3}$/,
   BY: /^2[1-4]\d{4}$/,
   CA: /^[ABCEGHJKLMNPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][\s\-]?\d[ABCEGHJ-NPRSTV-Z]\d$/i,
   CH: fourDigit,
   CN: /^(0[1-7]|1[012356]|2[0-7]|3[0-6]|4[0-7]|5[1-7]|6[1-7]|7[1-5]|8[1345]|9[09])\d{4}$/,
+  CO: /^(05|08|11|13|15|17|18|19|20|23|25|27|41|44|47|50|52|54|63|66|68|70|73|76|81|85|86|88|91|94|95|97|99)(\d{4})$/,
   CZ: /^\d{3}\s?\d{2}$/,
   DE: fiveDigit,
   DK: fourDigit,
@@ -32870,7 +33608,7 @@ var patterns = {
   EE: fiveDigit,
   ES: /^(5[0-2]{1}|[0-4]{1}\d{1})\d{3}$/,
   FI: fiveDigit,
-  FR: /^\d{2}\s?\d{3}$/,
+  FR: /^(?:(?:0[1-9]|[1-8]\d|9[0-5])\d{3}|97[1-46]\d{2})$/,
   GB: /^(gir\s?0aa|[a-z]{1,2}\d[\da-z]?\s?(\d[a-z]{2})?)$/i,
   GR: /^\d{3}\s?\d{2}$/,
   HR: /^([1-5]\d{4}$)/,
@@ -32891,14 +33629,17 @@ var patterns = {
   LU: fourDigit,
   LV: /^LV\-\d{4}$/,
   LK: fiveDigit,
+  MC: /^980\d{2}$/,
   MG: threeDigit,
   MX: fiveDigit,
   MT: /^[A-Za-z]{3}\s{0,1}\d{4}$/,
   MY: fiveDigit,
-  NL: /^\d{4}\s?[a-z]{2}$/i,
+  NL: /^[1-9]\d{3}\s?(?!sa|sd|ss)[a-z]{2}$/i,
   NO: fourDigit,
   NP: /^(10|21|22|32|33|34|44|45|56|57)\d{3}$|^(977)$/i,
   NZ: fourDigit,
+  // https://www.pakpost.gov.pk/postcodes.php
+  PK: fiveDigit,
   PL: /^\d{2}\-\d{3}$/,
   PR: /^00[679]\d{2}([ -]\d{4})?$/,
   PT: /^\d{4}\-\d{3}?$/,
@@ -32911,18 +33652,15 @@ var patterns = {
   SK: /^\d{3}\s?\d{2}$/,
   TH: fiveDigit,
   TN: fourDigit,
-  TW: /^\d{3}(\d{2})?$/,
+  TW: /^\d{3}(\d{2,3})?$/,
   UA: fiveDigit,
   US: /^\d{5}(-\d{4})?$/,
   ZA: fourDigit,
   ZM: fiveDigit
 };
-var locales = Object.keys(patterns);
-exports.locales = locales;
-
+var locales = exports.locales = Object.keys(patterns);
 function isPostalCode(str, locale) {
   (0, _assertString.default)(str);
-
   if (locale in patterns) {
     return patterns[locale].test(str);
   } else if (locale === 'any') {
@@ -32931,16 +33669,13 @@ function isPostalCode(str, locale) {
       // istanbul ignore else
       if (patterns.hasOwnProperty(key)) {
         var pattern = patterns[key];
-
         if (pattern.test(str)) {
           return true;
         }
       }
     }
-
     return false;
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
 
@@ -32956,12 +33691,10 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isRFC3339;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /* Based on https://tools.ietf.org/html/rfc3339#section-5.6 */
+
 var dateFullYear = /[0-9]{4}/;
 var dateMonth = /(0[1-9]|1[0-2])/;
 var dateMDay = /([12]\d|0[1-9]|3[01])/;
@@ -32975,12 +33708,10 @@ var partialTime = new RegExp("".concat(timeHour.source, ":").concat(timeMinute.s
 var fullDate = new RegExp("".concat(dateFullYear.source, "-").concat(dateMonth.source, "-").concat(dateMDay.source));
 var fullTime = new RegExp("".concat(partialTime.source).concat(timeOffset.source));
 var rfc3339 = new RegExp("^".concat(fullDate.source, "[ tT]").concat(fullTime.source, "$"));
-
 function isRFC3339(str) {
   (0, _assertString.default)(str);
   return rfc3339.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -32996,27 +33727,40 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isRgbColor;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); } /* eslint-disable prefer-rest-params */
 var rgbColor = /^rgb\((([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]),){2}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\)$/;
-var rgbaColor = /^rgba\((([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]),){3}(0?\.\d|1(\.0)?|0(\.0)?)\)$/;
+var rgbaColor = /^rgba\((([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]),){3}(0?\.\d\d?|1(\.0)?|0(\.0)?)\)$/;
 var rgbColorPercent = /^rgb\((([0-9]%|[1-9][0-9]%|100%),){2}([0-9]%|[1-9][0-9]%|100%)\)$/;
-var rgbaColorPercent = /^rgba\((([0-9]%|[1-9][0-9]%|100%),){3}(0?\.\d|1(\.0)?|0(\.0)?)\)$/;
-
-function isRgbColor(str) {
-  var includePercentValues = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+var rgbaColorPercent = /^rgba\((([0-9]%|[1-9][0-9]%|100%),){3}(0?\.\d\d?|1(\.0)?|0(\.0)?)\)$/;
+var startsWithRgb = /^rgba?/;
+function isRgbColor(str, options) {
   (0, _assertString.default)(str);
-
+  // default options to true for percent and false for spaces
+  var allowSpaces = false;
+  var includePercentValues = true;
+  if (_typeof(options) !== 'object') {
+    if (arguments.length >= 2) {
+      includePercentValues = arguments[1];
+    }
+  } else {
+    allowSpaces = options.allowSpaces !== undefined ? options.allowSpaces : allowSpaces;
+    includePercentValues = options.includePercentValues !== undefined ? options.includePercentValues : includePercentValues;
+  }
+  if (allowSpaces) {
+    // make sure it starts with continuous rgba? without spaces before stripping
+    if (!startsWithRgb.test(str)) {
+      return false;
+    }
+    // strip all whitespace
+    str = str.replace(/\s/g, '');
+  }
   if (!includePercentValues) {
     return rgbColor.test(str) || rgbaColor.test(str);
   }
-
   return rgbColor.test(str) || rgbaColor.test(str) || rgbColorPercent.test(str) || rgbaColorPercent.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -33032,13 +33776,9 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isSemVer;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _multilineRegex = _interopRequireDefault(__nccwpck_require__(4112));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /**
  * Regular Expression to match
  * semantic versioning (SemVer)
@@ -33046,12 +33786,10 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  * Reference: https://semver.org/
  */
 var semanticVersioningRegex = (0, _multilineRegex.default)(['^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)', '(?:-((?:0|[1-9]\\d*|\\d*[a-z-][0-9a-z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-z-][0-9a-z-]*))*))', '?(?:\\+([0-9a-z-]+(?:\\.[0-9a-z-]+)*))?$'], 'i');
-
 function isSemVer(str) {
   (0, _assertString.default)(str);
   return semanticVersioningRegex.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -33067,18 +33805,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isSlug;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var charsetRegex = /^[^\s-_](?!.*?[-_]{2,})[a-z0-9-\\][^\s]*[^-_\s]$/;
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var charsetRegex = /^[a-z0-9](?!.*[-_]{2,})(?:[a-z0-9_-]*[a-z0-9])?$/;
 function isSlug(str) {
   (0, _assertString.default)(str);
   return charsetRegex.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -33094,17 +33827,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isStrongPassword;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var upperCaseRegex = /^[A-Z]$/;
 var lowerCaseRegex = /^[a-z]$/;
 var numberRegex = /^[0-9]$/;
-var symbolRegex = /^[-#!$@£%^&*()_+|~=`{}\[\]:";'<>?,.\/ ]$/;
+var symbolRegex = /^[-#!$@£%^&*()_+|~=`{}\[\]:";'<>?,.\/\\ ]$/;
 var defaultOptions = {
   minLength: 8,
   minLowercase: 1,
@@ -33119,15 +33848,14 @@ var defaultOptions = {
   pointsForContainingNumber: 10,
   pointsForContainingSymbol: 10
 };
+
 /* Counts number of occurrences of each char in a string
  * could be moved to util/ ?
 */
-
 function countChars(str) {
   var result = {};
   Array.from(str).forEach(function (char) {
     var curVal = result[char];
-
     if (curVal) {
       result[char] += 1;
     } else {
@@ -33136,9 +33864,8 @@ function countChars(str) {
   });
   return result;
 }
+
 /* Return information about a password */
-
-
 function analyzePassword(password) {
   var charMap = countChars(password);
   var analysis = {
@@ -33163,44 +33890,34 @@ function analyzePassword(password) {
   });
   return analysis;
 }
-
 function scorePassword(analysis, scoringOptions) {
   var points = 0;
   points += analysis.uniqueChars * scoringOptions.pointsPerUnique;
   points += (analysis.length - analysis.uniqueChars) * scoringOptions.pointsPerRepeat;
-
   if (analysis.lowercaseCount > 0) {
     points += scoringOptions.pointsForContainingLower;
   }
-
   if (analysis.uppercaseCount > 0) {
     points += scoringOptions.pointsForContainingUpper;
   }
-
   if (analysis.numberCount > 0) {
     points += scoringOptions.pointsForContainingNumber;
   }
-
   if (analysis.symbolCount > 0) {
     points += scoringOptions.pointsForContainingSymbol;
   }
-
   return points;
 }
-
 function isStrongPassword(str) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
   (0, _assertString.default)(str);
   var analysis = analyzePassword(str);
   options = (0, _merge.default)(options || {}, defaultOptions);
-
   if (options.returnScore) {
     return scorePassword(analysis, options);
   }
-
   return analysis.length >= options.minLength && analysis.lowercaseCount >= options.minLowercase && analysis.uppercaseCount >= options.minUppercase && analysis.numberCount >= options.minNumbers && analysis.symbolCount >= options.minSymbols;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -33216,18 +33933,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isSurrogatePair;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var surrogatePair = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
-
 function isSurrogatePair(str) {
   (0, _assertString.default)(str);
   return surrogatePair.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -33239,37 +33951,22 @@ module.exports["default"] = exports.default;
 "use strict";
 
 
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isTaxID;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var algorithms = _interopRequireWildcard(__nccwpck_require__(4134));
-
 var _isDate = _interopRequireDefault(__nccwpck_require__(4845));
-
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function _getRequireWildcardCache() { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
-
+function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function _interopRequireWildcard(e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != _typeof(e) && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (var _t in e) "default" !== _t && {}.hasOwnProperty.call(e, _t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, _t)) && (i.get || i.set) ? o(f, _t, i) : f[_t] = e[_t]); return f; })(e, t); }
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-function _iterableToArray(iter) { if (typeof Symbol !== "undefined" && Symbol.iterator in Object(iter)) return Array.from(iter); }
-
-function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) return _arrayLikeToArray(arr); }
-
-function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 /**
  * TIN Validation
  * Validates Tax Identification Numbers (TINs) from the US, EU member states and the United Kingdom.
@@ -33290,6 +33987,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * See `http://www.irs.gov/Businesses/Small-Businesses-&-Self-Employed/How-EINs-are-Assigned-and-Valid-EIN-Prefixes`
  * for more information.
  */
+
 // Locale functions
 
 /*
@@ -33301,7 +33999,6 @@ function bgBgCheck(tin) {
   // Extract full year, normalize month and check birth date validity
   var century_year = tin.slice(0, 2);
   var month = parseInt(tin.slice(2, 4), 10);
-
   if (month > 40) {
     month -= 40;
     century_year = "20".concat(century_year);
@@ -33311,32 +34008,29 @@ function bgBgCheck(tin) {
   } else {
     century_year = "19".concat(century_year);
   }
-
   if (month < 10) {
     month = "0".concat(month);
   }
-
   var date = "".concat(century_year, "/").concat(month, "/").concat(tin.slice(4, 6));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // split digits into an array for further processing
+  }
 
-
+  // split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
-  }); // Calculate checksum by multiplying digits with fixed values
+  });
 
+  // Calculate checksum by multiplying digits with fixed values
   var multip_lookup = [2, 4, 8, 5, 10, 9, 7, 3, 6];
   var checksum = 0;
-
   for (var i = 0; i < multip_lookup.length; i++) {
     checksum += digits[i] * multip_lookup[i];
   }
-
   checksum = checksum % 11 === 10 ? 0 : checksum % 11;
   return checksum === digits[9];
 }
+
 /**
  * Check if an input is a valid Canadian SIN (Social Insurance Number)
  *
@@ -33350,8 +34044,6 @@ function bgBgCheck(tin) {
  * @param {string} input
  * @return {boolean}
  */
-
-
 function isCanadianSIN(input) {
   var digitsArray = input.split('');
   var even = digitsArray.filter(function (_, idx) {
@@ -33368,6 +34060,7 @@ function isCanadianSIN(input) {
   });
   return total % 10 === 0;
 }
+
 /*
  * cs-CZ validation function
  * (Rodné číslo (RČ), persons only)
@@ -33376,13 +34069,11 @@ function isCanadianSIN(input) {
  * -`https://lorenc.info/3MA381/overeni-spravnosti-rodneho-cisla.htm`
  * -`https://www.mvcr.cz/clanek/rady-a-sluzby-dokumenty-rodne-cislo.aspx`
  */
-
-
 function csCzCheck(tin) {
-  tin = tin.replace(/\W/, ''); // Extract full year from TIN length
+  tin = tin.replace(/\W/, '');
 
+  // Extract full year from TIN length
   var full_year = parseInt(tin.slice(0, 2), 10);
-
   if (tin.length === 10) {
     if (full_year < 54) {
       full_year = "20".concat(full_year);
@@ -33393,54 +34084,45 @@ function csCzCheck(tin) {
     if (tin.slice(6) === '000') {
       return false;
     } // Three-zero serial not assigned before 1954
-
-
     if (full_year < 54) {
       full_year = "19".concat(full_year);
     } else {
       return false; // No 18XX years seen in any of the resources
     }
-  } // Add missing zero if needed
-
-
+  }
+  // Add missing zero if needed
   if (full_year.length === 3) {
     full_year = [full_year.slice(0, 2), '0', full_year.slice(2)].join('');
-  } // Extract month from TIN and normalize
+  }
 
-
+  // Extract month from TIN and normalize
   var month = parseInt(tin.slice(2, 4), 10);
-
   if (month > 50) {
     month -= 50;
   }
-
   if (month > 20) {
     // Month-plus-twenty was only introduced in 2004
     if (parseInt(full_year, 10) < 2004) {
       return false;
     }
-
     month -= 20;
   }
-
   if (month < 10) {
     month = "0".concat(month);
-  } // Check date validity
+  }
 
-
+  // Check date validity
   var date = "".concat(full_year, "/").concat(month, "/").concat(tin.slice(4, 6));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Verify divisibility by 11
+  }
 
-
+  // Verify divisibility by 11
   if (tin.length === 10) {
     if (parseInt(tin, 10) % 11 !== 0) {
       // Some numbers up to and including 1985 are still valid if
       // check (last) digit equals 0 and modulo of first 9 digits equals 10
       var checkdigit = parseInt(tin.slice(0, 9), 10) % 11;
-
       if (parseInt(full_year, 10) < 1986 && checkdigit === 10) {
         if (parseInt(tin.slice(9), 10) !== 0) {
           return false;
@@ -33450,88 +34132,79 @@ function csCzCheck(tin) {
       }
     }
   }
-
   return true;
 }
+
 /*
  * de-AT validation function
  * (Abgabenkontonummer, persons/entities)
  * Verify TIN validity by calling luhnCheck()
  */
-
-
 function deAtCheck(tin) {
   return algorithms.luhnCheck(tin);
 }
+
 /*
  * de-DE validation function
  * (Steueridentifikationsnummer (Steuer-IdNr.), persons only)
  * Tests for single duplicate/triplicate value, then calculates ISO 7064 check (last) digit
  * Partial implementation of spec (same result with both algorithms always)
  */
-
-
 function deDeCheck(tin) {
   // Split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
-  }); // Fill array with strings of number positions
-
-  var occurences = [];
-
-  for (var i = 0; i < digits.length - 1; i++) {
-    occurences.push('');
-
-    for (var j = 0; j < digits.length - 1; j++) {
-      if (digits[i] === digits[j]) {
-        occurences[i] += j;
-      }
-    }
-  } // Remove digits with one occurence and test for only one duplicate/triplicate
-
-
-  occurences = occurences.filter(function (a) {
-    return a.length > 1;
   });
 
-  if (occurences.length !== 2 && occurences.length !== 3) {
+  // Fill array with strings of number positions
+  var occurrences = [];
+  for (var i = 0; i < digits.length - 1; i++) {
+    occurrences.push('');
+    for (var j = 0; j < digits.length - 1; j++) {
+      if (digits[i] === digits[j]) {
+        occurrences[i] += j;
+      }
+    }
+  }
+
+  // Remove digits with one occurrence and test for only one duplicate/triplicate
+  occurrences = occurrences.filter(function (a) {
+    return a.length > 1;
+  });
+  if (occurrences.length !== 2 && occurrences.length !== 3) {
     return false;
-  } // In case of triplicate value only two digits are allowed next to each other
+  }
 
-
-  if (occurences[0].length === 3) {
-    var trip_locations = occurences[0].split('').map(function (a) {
+  // In case of triplicate value only two digits are allowed next to each other
+  if (occurrences[0].length === 3) {
+    var trip_locations = occurrences[0].split('').map(function (a) {
       return parseInt(a, 10);
     });
-    var recurrent = 0; // Amount of neighbour occurences
-
+    var recurrent = 0; // Amount of neighbor occurrences
     for (var _i = 0; _i < trip_locations.length - 1; _i++) {
       if (trip_locations[_i] + 1 === trip_locations[_i + 1]) {
         recurrent += 1;
       }
     }
-
     if (recurrent === 2) {
       return false;
     }
   }
-
   return algorithms.iso7064Check(tin);
 }
+
 /*
  * dk-DK validation function
  * (CPR-nummer (personnummer), persons only)
  * Checks if birth date (first six digits) is valid and assigned to century (seventh) digit,
  * and calculates check (last) digit
  */
-
-
 function dkDkCheck(tin) {
-  tin = tin.replace(/\W/, ''); // Extract year, check if valid for given century digit and add century
+  tin = tin.replace(/\W/, '');
 
+  // Extract year, check if valid for given century digit and add century
   var year = parseInt(tin.slice(4, 6), 10);
   var century_digit = tin.slice(6, 7);
-
   switch (century_digit) {
     case '0':
     case '1':
@@ -33539,7 +34212,6 @@ function dkDkCheck(tin) {
     case '3':
       year = "19".concat(year);
       break;
-
     case '4':
     case '9':
       if (year < 37) {
@@ -33547,9 +34219,7 @@ function dkDkCheck(tin) {
       } else {
         year = "19".concat(year);
       }
-
       break;
-
     default:
       if (year < 37) {
         year = "20".concat(year);
@@ -33558,79 +34228,69 @@ function dkDkCheck(tin) {
       } else {
         return false;
       }
-
       break;
-  } // Add missing zero if needed
-
-
+  }
+  // Add missing zero if needed
   if (year.length === 3) {
     year = [year.slice(0, 2), '0', year.slice(2)].join('');
-  } // Check date validity
-
-
+  }
+  // Check date validity
   var date = "".concat(year, "/").concat(tin.slice(2, 4), "/").concat(tin.slice(0, 2));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Split digits into an array for further processing
+  }
 
-
+  // Split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
   });
   var checksum = 0;
-  var weight = 4; // Multiply by weight and add to checksum
-
+  var weight = 4;
+  // Multiply by weight and add to checksum
   for (var i = 0; i < 9; i++) {
     checksum += digits[i] * weight;
     weight -= 1;
-
     if (weight === 1) {
       weight = 7;
     }
   }
-
   checksum %= 11;
-
   if (checksum === 1) {
     return false;
   }
-
   return checksum === 0 ? digits[9] === 0 : digits[9] === 11 - checksum;
 }
+
 /*
  * el-CY validation function
  * (Arithmos Forologikou Mitroou (AFM/ΑΦΜ), persons only)
  * Verify TIN validity by calculating ASCII value of check (last) character
  */
-
-
 function elCyCheck(tin) {
   // split digits into an array for further processing
   var digits = tin.slice(0, 8).split('').map(function (a) {
     return parseInt(a, 10);
   });
-  var checksum = 0; // add digits in even places
-
+  var checksum = 0;
+  // add digits in even places
   for (var i = 1; i < digits.length; i += 2) {
     checksum += digits[i];
-  } // add digits in odd places
+  }
 
-
+  // add digits in odd places
   for (var _i2 = 0; _i2 < digits.length; _i2 += 2) {
     if (digits[_i2] < 2) {
       checksum += 1 - digits[_i2];
     } else {
       checksum += 2 * (digits[_i2] - 2) + 5;
-
       if (digits[_i2] > 4) {
         checksum += 2;
       }
     }
   }
-
   return String.fromCharCode(checksum % 26 + 65) === tin.charAt(8);
 }
+
 /*
  * el-GR validation function
  * (Arithmos Forologikou Mitroou (AFM/ΑΦΜ), persons/entities)
@@ -33638,21 +34298,18 @@ function elCyCheck(tin) {
  * Algorithm not in DG TAXUD document- sourced from:
  * - `http://epixeirisi.gr/%CE%9A%CE%A1%CE%99%CE%A3%CE%99%CE%9C%CE%91-%CE%98%CE%95%CE%9C%CE%91%CE%A4%CE%91-%CE%A6%CE%9F%CE%A1%CE%9F%CE%9B%CE%9F%CE%93%CE%99%CE%91%CE%A3-%CE%9A%CE%91%CE%99-%CE%9B%CE%9F%CE%93%CE%99%CE%A3%CE%A4%CE%99%CE%9A%CE%97%CE%A3/23791/%CE%91%CF%81%CE%B9%CE%B8%CE%BC%CF%8C%CF%82-%CE%A6%CE%BF%CF%81%CE%BF%CE%BB%CE%BF%CE%B3%CE%B9%CE%BA%CE%BF%CF%8D-%CE%9C%CE%B7%CF%84%CF%81%CF%8E%CE%BF%CF%85`
  */
-
-
 function elGrCheck(tin) {
   // split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
   });
   var checksum = 0;
-
   for (var i = 0; i < 8; i++) {
     checksum += digits[i] * Math.pow(2, 8 - i);
   }
-
   return checksum % 11 % 10 === digits[8];
 }
+
 /*
  * en-GB validation function (should go here if needed)
  * (National Insurance Number (NINO) or Unique Taxpayer Reference (UTR),
@@ -33664,27 +34321,21 @@ function elGrCheck(tin) {
  * (Personal Public Service Number (PPS No), persons only)
  * Verify TIN validity by calculating check (second to last) character
  */
-
-
 function enIeCheck(tin) {
   var checksum = algorithms.reverseMultiplyAndSum(tin.split('').slice(0, 7).map(function (a) {
     return parseInt(a, 10);
   }), 8);
-
   if (tin.length === 9 && tin[8] !== 'W') {
     checksum += (tin[8].charCodeAt(0) - 64) * 9;
   }
-
   checksum %= 23;
-
   if (checksum === 0) {
     return tin[7].toUpperCase() === 'W';
   }
-
   return tin[7].toUpperCase() === String.fromCharCode(64 + checksum);
-} // Valid US IRS campus prefixes
+}
 
-
+// Valid US IRS campus prefixes
 var enUsCampusPrefix = {
   andover: ['10', '12'],
   atlanta: ['60', '67'],
@@ -33698,11 +34349,11 @@ var enUsCampusPrefix = {
   ogden: ['80', '90'],
   philadelphia: ['33', '39', '41', '42', '43', '46', '48', '62', '63', '64', '66', '68', '71', '72', '73', '74', '75', '76', '77', '81', '82', '83', '84', '85', '86', '87', '88', '91', '92', '93', '98', '99'],
   sba: ['31']
-}; // Return an array of all US IRS campus prefixes
+};
 
+// Return an array of all US IRS campus prefixes
 function enUsGetPrefixes() {
   var prefixes = [];
-
   for (var location in enUsCampusPrefix) {
     // https://github.com/gotwarlost/istanbul/blob/master/ignoring-code-for-coverage.md#ignoring-code-for-coverage-purposes
     // istanbul ignore else
@@ -33710,58 +34361,78 @@ function enUsGetPrefixes() {
       prefixes.push.apply(prefixes, _toConsumableArray(enUsCampusPrefix[location]));
     }
   }
-
   return prefixes;
 }
+
 /*
  * en-US validation function
  * Verify that the TIN starts with a valid IRS campus prefix
  */
-
-
 function enUsCheck(tin) {
   return enUsGetPrefixes().indexOf(tin.slice(0, 2)) !== -1;
 }
+
+/*
+ * es-AR validation function
+ * Clave Única de Identificación Tributaria (CUIT/CUIL)
+ * Sourced from:
+ * - https://servicioscf.afip.gob.ar/publico/abc/ABCpaso2.aspx?id_nivel1=3036&id_nivel2=3040&p=Conceptos%20b%C3%A1sicos
+ * - https://es.wikipedia.org/wiki/Clave_%C3%9Anica_de_Identificaci%C3%B3n_Tributaria
+ */
+
+function esArCheck(tin) {
+  var accum = 0;
+  var digits = tin.split('');
+  var digit = parseInt(digits.pop(), 10);
+  for (var i = 0; i < digits.length; i++) {
+    accum += digits[9 - i] * (2 + i % 6);
+  }
+  var verif = 11 - accum % 11;
+  if (verif === 11) {
+    verif = 0;
+  } else if (verif === 10) {
+    verif = 9;
+  }
+  return digit === verif;
+}
+
 /*
  * es-ES validation function
  * (Documento Nacional de Identidad (DNI)
  * or Número de Identificación de Extranjero (NIE), persons only)
  * Verify TIN validity by calculating check (last) character
  */
-
-
 function esEsCheck(tin) {
   // Split characters into an array for further processing
-  var chars = tin.toUpperCase().split(''); // Replace initial letter if needed
+  var chars = tin.toUpperCase().split('');
 
+  // Replace initial letter if needed
   if (isNaN(parseInt(chars[0], 10)) && chars.length > 1) {
     var lead_replace = 0;
-
     switch (chars[0]) {
       case 'Y':
         lead_replace = 1;
         break;
-
       case 'Z':
         lead_replace = 2;
         break;
-
       default:
     }
-
-    chars.splice(0, 1, lead_replace); // Fill with zeros if smaller than proper
+    chars.splice(0, 1, lead_replace);
+    // Fill with zeros if smaller than proper
   } else {
     while (chars.length < 9) {
       chars.unshift(0);
     }
-  } // Calculate checksum and check according to lookup
+  }
 
-
+  // Calculate checksum and check according to lookup
   var lookup = ['T', 'R', 'W', 'A', 'G', 'M', 'Y', 'F', 'P', 'D', 'X', 'B', 'N', 'J', 'Z', 'S', 'Q', 'V', 'H', 'L', 'C', 'K', 'E'];
   chars = chars.join('');
   var checksum = parseInt(chars.slice(0, 8), 10) % 23;
   return chars[8] === lookup[checksum];
 }
+
 /*
  * et-EE validation function
  * (Isikukood (IK), persons only)
@@ -33769,215 +34440,181 @@ function esEsCheck(tin) {
  * Material not in DG TAXUD document sourced from:
  * - `https://www.oecd.org/tax/automatic-exchange/crs-implementation-and-assistance/tax-identification-numbers/Estonia-TIN.pdf`
  */
-
-
 function etEeCheck(tin) {
   // Extract year and add century
   var full_year = tin.slice(1, 3);
   var century_digit = tin.slice(0, 1);
-
   switch (century_digit) {
     case '1':
     case '2':
       full_year = "18".concat(full_year);
       break;
-
     case '3':
     case '4':
       full_year = "19".concat(full_year);
       break;
-
     default:
       full_year = "20".concat(full_year);
       break;
-  } // Check date validity
-
-
+  }
+  // Check date validity
   var date = "".concat(full_year, "/").concat(tin.slice(3, 5), "/").concat(tin.slice(5, 7));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Split digits into an array for further processing
+  }
 
-
+  // Split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
   });
   var checksum = 0;
-  var weight = 1; // Multiply by weight and add to checksum
-
+  var weight = 1;
+  // Multiply by weight and add to checksum
   for (var i = 0; i < 10; i++) {
     checksum += digits[i] * weight;
     weight += 1;
-
     if (weight === 10) {
       weight = 1;
     }
-  } // Do again if modulo 11 of checksum is 10
-
-
+  }
+  // Do again if modulo 11 of checksum is 10
   if (checksum % 11 === 10) {
     checksum = 0;
     weight = 3;
-
     for (var _i3 = 0; _i3 < 10; _i3++) {
       checksum += digits[_i3] * weight;
       weight += 1;
-
       if (weight === 10) {
         weight = 1;
       }
     }
-
     if (checksum % 11 === 10) {
       return digits[10] === 0;
     }
   }
-
   return checksum % 11 === digits[10];
 }
+
 /*
  * fi-FI validation function
  * (Henkilötunnus (HETU), persons only)
  * Checks if birth date (first six digits plus century symbol) is valid
  * and calculates check (last) digit
  */
-
-
 function fiFiCheck(tin) {
   // Extract year and add century
   var full_year = tin.slice(4, 6);
   var century_symbol = tin.slice(6, 7);
-
   switch (century_symbol) {
     case '+':
       full_year = "18".concat(full_year);
       break;
-
     case '-':
       full_year = "19".concat(full_year);
       break;
-
     default:
       full_year = "20".concat(full_year);
       break;
-  } // Check date validity
-
-
+  }
+  // Check date validity
   var date = "".concat(full_year, "/").concat(tin.slice(2, 4), "/").concat(tin.slice(0, 2));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Calculate check character
+  }
 
-
+  // Calculate check character
   var checksum = parseInt(tin.slice(0, 6) + tin.slice(7, 10), 10) % 31;
-
   if (checksum < 10) {
     return checksum === parseInt(tin.slice(10), 10);
   }
-
   checksum -= 10;
   var letters_lookup = ['A', 'B', 'C', 'D', 'E', 'F', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'];
   return letters_lookup[checksum] === tin.slice(10);
 }
+
 /*
  * fr/nl-BE validation function
  * (Numéro national (N.N.), persons only)
  * Checks if birth date (first six digits) is valid and calculates check (last two) digits
  */
-
-
 function frBeCheck(tin) {
   // Zero month/day value is acceptable
   if (tin.slice(2, 4) !== '00' || tin.slice(4, 6) !== '00') {
     // Extract date from first six digits of TIN
     var date = "".concat(tin.slice(0, 2), "/").concat(tin.slice(2, 4), "/").concat(tin.slice(4, 6));
-
     if (!(0, _isDate.default)(date, 'YY/MM/DD')) {
       return false;
     }
   }
-
   var checksum = 97 - parseInt(tin.slice(0, 9), 10) % 97;
   var checkdigits = parseInt(tin.slice(9, 11), 10);
-
   if (checksum !== checkdigits) {
     checksum = 97 - parseInt("2".concat(tin.slice(0, 9)), 10) % 97;
-
     if (checksum !== checkdigits) {
       return false;
     }
   }
-
   return true;
 }
+
 /*
  * fr-FR validation function
  * (Numéro fiscal de référence (numéro SPI), persons only)
  * Verify TIN validity by calculating check (last three) digits
  */
-
-
 function frFrCheck(tin) {
   tin = tin.replace(/\s/g, '');
   var checksum = parseInt(tin.slice(0, 10), 10) % 511;
   var checkdigits = parseInt(tin.slice(10, 13), 10);
   return checksum === checkdigits;
 }
+
 /*
  * fr/lb-LU validation function
  * (numéro d’identification personnelle, persons only)
  * Verify birth date validity and run Luhn and Verhoeff checks
  */
-
-
 function frLuCheck(tin) {
   // Extract date and check validity
   var date = "".concat(tin.slice(0, 4), "/").concat(tin.slice(4, 6), "/").concat(tin.slice(6, 8));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Run Luhn check
+  }
 
-
+  // Run Luhn check
   if (!algorithms.luhnCheck(tin.slice(0, 12))) {
     return false;
-  } // Remove Luhn check digit and run Verhoeff check
-
-
+  }
+  // Remove Luhn check digit and run Verhoeff check
   return algorithms.verhoeffCheck("".concat(tin.slice(0, 11)).concat(tin[12]));
 }
+
 /*
  * hr-HR validation function
  * (Osobni identifikacijski broj (OIB), persons/entities)
  * Verify TIN validity by calling iso7064Check(digits)
  */
-
-
 function hrHrCheck(tin) {
   return algorithms.iso7064Check(tin);
 }
+
 /*
  * hu-HU validation function
  * (Adóazonosító jel, persons only)
  * Verify TIN validity by calculating check (last) digit
  */
-
-
 function huHuCheck(tin) {
   // split digits into an array for further processing
   var digits = tin.split('').map(function (a) {
     return parseInt(a, 10);
   });
   var checksum = 8;
-
   for (var i = 1; i < 9; i++) {
     checksum += digits[i] * (i + 1);
   }
-
   return checksum % 11 === digits[9];
 }
+
 /*
  * lt-LT validation function (should go here if needed)
  * (Asmens kodas, persons/entities respectively)
@@ -33993,15 +34630,13 @@ function huHuCheck(tin) {
  * Vowels may only be followed by other vowels or an X character
  * and X characters after vowels may only be followed by other X characters.
  */
-
-
 function itItNameCheck(name) {
-  // true at the first occurence of a vowel
-  var vowelflag = false; // true at the first occurence of an X AFTER vowel
+  // true at the first occurrence of a vowel
+  var vowelflag = false;
+
+  // true at the first occurrence of an X AFTER vowel
   // (to properly handle last names with X as consonant)
-
   var xflag = false;
-
   for (var i = 0; i < 3; i++) {
     if (!vowelflag && /[AEIOU]/.test(name[i])) {
       vowelflag = true;
@@ -34013,7 +34648,6 @@ function itItNameCheck(name) {
           return false;
         }
       }
-
       if (xflag) {
         if (!/X/.test(name[i])) {
           return false;
@@ -34021,9 +34655,9 @@ function itItNameCheck(name) {
       }
     }
   }
-
   return true;
 }
+
 /*
  * it-IT validation function
  * (Codice fiscale (TIN-IT), persons only)
@@ -34032,21 +34666,19 @@ function itItNameCheck(name) {
  * Material not in DG-TAXUD document sourced from:
  * `https://en.wikipedia.org/wiki/Italian_fiscal_code`
  */
-
-
 function itItCheck(tin) {
   // Capitalize and split characters into an array for further processing
-  var chars = tin.toUpperCase().split(''); // Check first and last name validity calling itItNameCheck()
+  var chars = tin.toUpperCase().split('');
 
+  // Check first and last name validity calling itItNameCheck()
   if (!itItNameCheck(chars.slice(0, 3))) {
     return false;
   }
-
   if (!itItNameCheck(chars.slice(3, 6))) {
     return false;
-  } // Convert letters in number spaces back to numbers if any
+  }
 
-
+  // Convert letters in number spaces back to numbers if any
   var number_locations = [6, 7, 9, 10, 12, 13, 14];
   var number_replace = {
     L: '0',
@@ -34060,16 +34692,14 @@ function itItCheck(tin) {
     U: '8',
     V: '9'
   };
-
   for (var _i4 = 0, _number_locations = number_locations; _i4 < _number_locations.length; _i4++) {
     var i = _number_locations[_i4];
-
     if (chars[i] in number_replace) {
       chars.splice(i, 1, number_replace[chars[i]]);
     }
-  } // Extract month and day, and check date validity
+  }
 
-
+  // Extract month and day, and check date validity
   var month_replace = {
     A: '01',
     B: '02',
@@ -34086,34 +34716,26 @@ function itItCheck(tin) {
   };
   var month = month_replace[chars[8]];
   var day = parseInt(chars[9] + chars[10], 10);
-
   if (day > 40) {
     day -= 40;
   }
-
   if (day < 10) {
     day = "0".concat(day);
   }
-
   var date = "".concat(chars[6]).concat(chars[7], "/").concat(month, "/").concat(day);
-
   if (!(0, _isDate.default)(date, 'YY/MM/DD')) {
     return false;
-  } // Calculate check character by adding up even and odd characters as numbers
+  }
 
-
+  // Calculate check character by adding up even and odd characters as numbers
   var checksum = 0;
-
   for (var _i5 = 1; _i5 < chars.length - 1; _i5 += 2) {
     var char_to_int = parseInt(chars[_i5], 10);
-
     if (isNaN(char_to_int)) {
       char_to_int = chars[_i5].charCodeAt(0) - 65;
     }
-
     checksum += char_to_int;
   }
-
   var odd_convert = {
     // Maps of characters at odd places
     A: 1,
@@ -34145,30 +34767,25 @@ function itItCheck(tin) {
     0: 1,
     1: 0
   };
-
   for (var _i6 = 0; _i6 < chars.length - 1; _i6 += 2) {
     var _char_to_int = 0;
-
     if (chars[_i6] in odd_convert) {
       _char_to_int = odd_convert[chars[_i6]];
     } else {
       var multiplier = parseInt(chars[_i6], 10);
       _char_to_int = 2 * multiplier + 1;
-
       if (multiplier > 4) {
         _char_to_int += 2;
       }
     }
-
     checksum += _char_to_int;
   }
-
   if (String.fromCharCode(65 + checksum % 26) !== chars[15]) {
     return false;
   }
-
   return true;
 }
+
 /*
  * lv-LV validation function
  * (Personas kods (PK), persons only)
@@ -34177,147 +34794,120 @@ function itItCheck(tin) {
  * Material not in DG TAXUD document sourced from:
  * `https://boot.ritakafija.lv/forums/index.php?/topic/88314-personas-koda-algoritms-%C4%8Deksumma/`
  */
-
-
 function lvLvCheck(tin) {
-  tin = tin.replace(/\W/, ''); // Extract date from TIN
-
+  tin = tin.replace(/\W/, '');
+  // Extract date from TIN
   var day = tin.slice(0, 2);
-
   if (day !== '32') {
     // No date/checksum check if new format
     var month = tin.slice(2, 4);
-
     if (month !== '00') {
       // No date check if unknown month
       var full_year = tin.slice(4, 6);
-
       switch (tin[6]) {
         case '0':
           full_year = "18".concat(full_year);
           break;
-
         case '1':
           full_year = "19".concat(full_year);
           break;
-
         default:
           full_year = "20".concat(full_year);
           break;
-      } // Check date validity
-
-
+      }
+      // Check date validity
       var date = "".concat(full_year, "/").concat(tin.slice(2, 4), "/").concat(day);
-
       if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
         return false;
       }
-    } // Calculate check digit
+    }
 
-
+    // Calculate check digit
     var checksum = 1101;
     var multip_lookup = [1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
-
     for (var i = 0; i < tin.length - 1; i++) {
       checksum -= parseInt(tin[i], 10) * multip_lookup[i];
     }
-
     return parseInt(tin[10], 10) === checksum % 11;
   }
-
   return true;
 }
+
 /*
  * mt-MT validation function
  * (Identity Card Number or Unique Taxpayer Reference, persons/entities)
  * Verify Identity Card Number structure (no other tests found)
  */
-
-
 function mtMtCheck(tin) {
   if (tin.length !== 9) {
     // No tests for UTR
-    var chars = tin.toUpperCase().split(''); // Fill with zeros if smaller than proper
-
+    var chars = tin.toUpperCase().split('');
+    // Fill with zeros if smaller than proper
     while (chars.length < 8) {
       chars.unshift(0);
-    } // Validate format according to last character
-
-
+    }
+    // Validate format according to last character
     switch (tin[7]) {
       case 'A':
       case 'P':
         if (parseInt(chars[6], 10) === 0) {
           return false;
         }
-
         break;
-
       default:
         {
           var first_part = parseInt(chars.join('').slice(0, 5), 10);
-
           if (first_part > 32000) {
             return false;
           }
-
           var second_part = parseInt(chars.join('').slice(5, 7), 10);
-
           if (first_part === second_part) {
             return false;
           }
         }
     }
   }
-
   return true;
 }
+
 /*
  * nl-NL validation function
  * (Burgerservicenummer (BSN) or Rechtspersonen Samenwerkingsverbanden Informatie Nummer (RSIN),
  * persons/entities respectively)
  * Verify TIN validity by calculating check (last) digit (variant of MOD 11)
  */
-
-
 function nlNlCheck(tin) {
   return algorithms.reverseMultiplyAndSum(tin.split('').slice(0, 8).map(function (a) {
     return parseInt(a, 10);
   }), 9) % 11 === parseInt(tin[8], 10);
 }
+
 /*
  * pl-PL validation function
  * (Powszechny Elektroniczny System Ewidencji Ludności (PESEL)
  * or Numer identyfikacji podatkowej (NIP), persons/entities)
  * Verify TIN validity by validating birth date (PESEL) and calculating check (last) digit
  */
-
-
 function plPlCheck(tin) {
   // NIP
   if (tin.length === 10) {
     // Calculate last digit by multiplying with lookup
     var lookup = [6, 5, 7, 2, 3, 4, 5, 6, 7];
     var _checksum = 0;
-
     for (var i = 0; i < lookup.length; i++) {
       _checksum += parseInt(tin[i], 10) * lookup[i];
     }
-
     _checksum %= 11;
-
     if (_checksum === 10) {
       return false;
     }
-
     return _checksum === parseInt(tin[9], 10);
-  } // PESEL
+  }
+
+  // PESEL
   // Extract full year using month
-
-
   var full_year = tin.slice(0, 2);
   var month = parseInt(tin.slice(2, 4), 10);
-
   if (month > 80) {
     full_year = "18".concat(full_year);
     month -= 80;
@@ -34332,140 +34922,132 @@ function plPlCheck(tin) {
     month -= 20;
   } else {
     full_year = "19".concat(full_year);
-  } // Add leading zero to month if needed
-
-
+  }
+  // Add leading zero to month if needed
   if (month < 10) {
     month = "0".concat(month);
-  } // Check date validity
-
-
+  }
+  // Check date validity
   var date = "".concat(full_year, "/").concat(month, "/").concat(tin.slice(4, 6));
-
   if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
-  } // Calculate last digit by mulitplying with odd one-digit numbers except 5
+  }
 
-
+  // Calculate last digit by multiplying with odd one-digit numbers except 5
   var checksum = 0;
   var multiplier = 1;
-
   for (var _i7 = 0; _i7 < tin.length - 1; _i7++) {
     checksum += parseInt(tin[_i7], 10) * multiplier % 10;
     multiplier += 2;
-
     if (multiplier > 10) {
       multiplier = 1;
     } else if (multiplier === 5) {
       multiplier += 2;
     }
   }
-
   checksum = 10 - checksum % 10;
   return checksum === parseInt(tin[10], 10);
 }
+
 /*
-* pt-BR validation function
-* (Cadastro de Pessoas Físicas (CPF, persons)
-* Cadastro Nacional de Pessoas Jurídicas (CNPJ, entities)
-* Both inputs will be validated
-*/
+ * pt-BR validation function
+ * (Cadastro de Pessoas Físicas (CPF, persons)
+ * Cadastro Nacional de Pessoas Jurídicas (CNPJ, entities)
+ * Both inputs will be validated.
+ * CPF accepts formatted (XXX.XXX.XXX-XX) and unformatted input;
+ * formatting is stripped before validation.
+ * CNPJ supports both numeric (legacy) and alphanumeric format (starting July 2026).
+ */
 
+/**
+ * Convert a CNPJ character to its numeric value for check digit calculation.
+ * Numbers 0-9 map to values 0-9, letters A-Z map to values 17-42.
+ * This is done by subtracting 48 from the ASCII code.
+ */
+function cnpjCharToValue(char) {
+  return char.charCodeAt(0) - 48;
+}
 
+/**
+ * Validate CNPJ (both numeric and alphanumeric formats).
+ * Algorithm: module 11 with weights 2-9 from right to left.
+ */
+function validateCnpj(cnpj) {
+  // Get the 12 identifier characters and 2 check digits
+  var identifiers = cnpj.substring(0, 12).toUpperCase();
+  var checkDigits = cnpj.substring(12);
+
+  // Reject CNPJs with all same characters (e.g., '00000000000000', 'AAAAAAAAAAAAAA')
+  if (/^(.)\1+$/.test(cnpj.toUpperCase())) {
+    return false;
+  }
+
+  // Calculate first check digit
+  var sum = 0;
+  var weight = 5;
+  for (var i = 0; i < 12; i++) {
+    sum += cnpjCharToValue(identifiers.charAt(i)) * weight;
+    weight = weight === 2 ? 9 : weight - 1;
+  }
+  var remainder = sum % 11;
+  var firstDV = remainder < 2 ? 0 : 11 - remainder;
+  if (firstDV !== parseInt(checkDigits.charAt(0), 10)) {
+    return false;
+  }
+
+  // Calculate second check digit (includes first check digit)
+  sum = 0;
+  weight = 6;
+  for (var _i8 = 0; _i8 < 12; _i8++) {
+    sum += cnpjCharToValue(identifiers.charAt(_i8)) * weight;
+    weight = weight === 2 ? 9 : weight - 1;
+  }
+  sum += firstDV * 2;
+  remainder = sum % 11;
+  var secondDV = remainder < 2 ? 0 : 11 - remainder;
+  return secondDV === parseInt(checkDigits.charAt(1), 10);
+}
 function ptBrCheck(tin) {
+  // Strip CPF formatting (XXX.XXX.XXX-XX)
+  tin = tin.replace(/[.\-/]/g, '');
   if (tin.length === 11) {
-    var _sum;
-
+    var sum;
     var remainder;
-    _sum = 0;
-    if ( // Reject known invalid CPFs
+    sum = 0;
+    if (
+    // Reject known invalid CPFs
     tin === '11111111111' || tin === '22222222222' || tin === '33333333333' || tin === '44444444444' || tin === '55555555555' || tin === '66666666666' || tin === '77777777777' || tin === '88888888888' || tin === '99999999999' || tin === '00000000000') return false;
-
-    for (var i = 1; i <= 9; i++) {
-      _sum += parseInt(tin.substring(i - 1, i), 10) * (11 - i);
-    }
-
-    remainder = _sum * 10 % 11;
+    for (var i = 1; i <= 9; i++) sum += parseInt(tin.substring(i - 1, i), 10) * (11 - i);
+    remainder = sum * 10 % 11;
     if (remainder === 10) remainder = 0;
     if (remainder !== parseInt(tin.substring(9, 10), 10)) return false;
-    _sum = 0;
-
-    for (var _i8 = 1; _i8 <= 10; _i8++) {
-      _sum += parseInt(tin.substring(_i8 - 1, _i8), 10) * (12 - _i8);
-    }
-
-    remainder = _sum * 10 % 11;
+    sum = 0;
+    for (var _i9 = 1; _i9 <= 10; _i9++) sum += parseInt(tin.substring(_i9 - 1, _i9), 10) * (12 - _i9);
+    remainder = sum * 10 % 11;
     if (remainder === 10) remainder = 0;
     if (remainder !== parseInt(tin.substring(10, 11), 10)) return false;
     return true;
   }
 
-  if ( // Reject know invalid CNPJs
-  tin === '00000000000000' || tin === '11111111111111' || tin === '22222222222222' || tin === '33333333333333' || tin === '44444444444444' || tin === '55555555555555' || tin === '66666666666666' || tin === '77777777777777' || tin === '88888888888888' || tin === '99999999999999') {
-    return false;
-  }
-
-  var length = tin.length - 2;
-  var identifiers = tin.substring(0, length);
-  var verificators = tin.substring(length);
-  var sum = 0;
-  var pos = length - 7;
-
-  for (var _i9 = length; _i9 >= 1; _i9--) {
-    sum += identifiers.charAt(length - _i9) * pos;
-    pos -= 1;
-
-    if (pos < 2) {
-      pos = 9;
-    }
-  }
-
-  var result = sum % 11 < 2 ? 0 : 11 - sum % 11;
-
-  if (result !== parseInt(verificators.charAt(0), 10)) {
-    return false;
-  }
-
-  length += 1;
-  identifiers = tin.substring(0, length);
-  sum = 0;
-  pos = length - 7;
-
-  for (var _i10 = length; _i10 >= 1; _i10--) {
-    sum += identifiers.charAt(length - _i10) * pos;
-    pos -= 1;
-
-    if (pos < 2) {
-      pos = 9;
-    }
-  }
-
-  result = sum % 11 < 2 ? 0 : 11 - sum % 11;
-
-  if (result !== parseInt(verificators.charAt(1), 10)) {
-    return false;
-  }
-
-  return true;
+  // CNPJ validation (supports both numeric and alphanumeric formats)
+  return validateCnpj(tin);
 }
+
 /*
  * pt-PT validation function
  * (Número de identificação fiscal (NIF), persons/entities)
  * Verify TIN validity by calculating check (last) digit (variant of MOD 11)
  */
-
-
 function ptPtCheck(tin) {
   var checksum = 11 - algorithms.reverseMultiplyAndSum(tin.split('').slice(0, 8).map(function (a) {
     return parseInt(a, 10);
   }), 9) % 11;
-
   if (checksum > 9) {
     return parseInt(tin[8], 10) === 0;
   }
-
   return checksum === parseInt(tin[8], 10);
 }
+
 /*
  * ro-RO validation function
  * (Cod Numeric Personal (CNP) or Cod de înregistrare fiscală (CIF),
@@ -34474,64 +35056,54 @@ function ptPtCheck(tin) {
  * Material not in DG TAXUD document sourced from:
  * `https://en.wikipedia.org/wiki/National_identification_number#Romania`
  */
-
-
 function roRoCheck(tin) {
   if (tin.slice(0, 4) !== '9000') {
     // No test found for this format
     // Extract full year using century digit if possible
     var full_year = tin.slice(1, 3);
-
     switch (tin[0]) {
       case '1':
       case '2':
         full_year = "19".concat(full_year);
         break;
-
       case '3':
       case '4':
         full_year = "18".concat(full_year);
         break;
-
       case '5':
       case '6':
         full_year = "20".concat(full_year);
         break;
-
       default:
-    } // Check date validity
+    }
 
-
+    // Check date validity
     var date = "".concat(full_year, "/").concat(tin.slice(3, 5), "/").concat(tin.slice(5, 7));
-
     if (date.length === 8) {
       if (!(0, _isDate.default)(date, 'YY/MM/DD')) {
         return false;
       }
     } else if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
       return false;
-    } // Calculate check digit
+    }
 
-
+    // Calculate check digit
     var digits = tin.split('').map(function (a) {
       return parseInt(a, 10);
     });
     var multipliers = [2, 7, 9, 1, 4, 6, 3, 5, 8, 2, 7, 9];
     var checksum = 0;
-
     for (var i = 0; i < multipliers.length; i++) {
       checksum += digits[i] * multipliers[i];
     }
-
     if (checksum % 11 === 10) {
       return digits[12] === 1;
     }
-
     return digits[12] === checksum % 11;
   }
-
   return true;
 }
+
 /*
  * sk-SK validation function
  * (Rodné číslo (RČ) or bezvýznamové identifikačné číslo (BIČ), persons only)
@@ -34539,101 +35111,83 @@ function roRoCheck(tin) {
  * Due to the introduction of the pseudo-random BIČ it is not possible to test
  * post-1954 birth numbers without knowing whether they are BIČ or RČ beforehand
  */
-
-
 function skSkCheck(tin) {
   if (tin.length === 9) {
     tin = tin.replace(/\W/, '');
-
     if (tin.slice(6) === '000') {
       return false;
     } // Three-zero serial not assigned before 1954
+
     // Extract full year from TIN length
-
-
     var full_year = parseInt(tin.slice(0, 2), 10);
-
     if (full_year > 53) {
       return false;
     }
-
     if (full_year < 10) {
       full_year = "190".concat(full_year);
     } else {
       full_year = "19".concat(full_year);
-    } // Extract month from TIN and normalize
+    }
 
-
+    // Extract month from TIN and normalize
     var month = parseInt(tin.slice(2, 4), 10);
-
     if (month > 50) {
       month -= 50;
     }
-
     if (month < 10) {
       month = "0".concat(month);
-    } // Check date validity
+    }
 
-
+    // Check date validity
     var date = "".concat(full_year, "/").concat(month, "/").concat(tin.slice(4, 6));
-
     if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
       return false;
     }
   }
-
   return true;
 }
+
 /*
  * sl-SI validation function
  * (Davčna številka, persons/entities)
  * Verify TIN validity by calculating check (last) digit (variant of MOD 11)
  */
-
-
 function slSiCheck(tin) {
   var checksum = 11 - algorithms.reverseMultiplyAndSum(tin.split('').slice(0, 7).map(function (a) {
     return parseInt(a, 10);
   }), 8) % 11;
-
   if (checksum === 10) {
     return parseInt(tin[7], 10) === 0;
   }
-
   return checksum === parseInt(tin[7], 10);
 }
+
 /*
  * sv-SE validation function
  * (Personnummer or samordningsnummer, persons only)
  * Checks validity of birth date and calls luhnCheck() to validate check (last) digit
  */
-
-
 function svSeCheck(tin) {
   // Make copy of TIN and normalize to two-digit year form
   var tin_copy = tin.slice(0);
-
   if (tin.length > 11) {
     tin_copy = tin_copy.slice(2);
-  } // Extract date of birth
+  }
 
-
+  // Extract date of birth
   var full_year = '';
   var month = tin_copy.slice(2, 4);
   var day = parseInt(tin_copy.slice(4, 6), 10);
-
   if (tin.length > 11) {
     full_year = tin.slice(0, 4);
   } else {
     full_year = tin.slice(0, 2);
-
     if (tin.length === 11 && day < 60) {
       // Extract full year from centenarian symbol
       // Should work just fine until year 10000 or so
       var current_year = new Date().getFullYear().toString();
       var current_century = parseInt(current_year.slice(0, 2), 10);
       current_year = parseInt(current_year, 10);
-
       if (tin[6] === '-') {
         if (parseInt("".concat(current_century).concat(full_year), 10) > current_year) {
           full_year = "".concat(current_century - 1).concat(full_year);
@@ -34642,25 +35196,21 @@ function svSeCheck(tin) {
         }
       } else {
         full_year = "".concat(current_century - 1).concat(full_year);
-
         if (current_year - parseInt(full_year, 10) < 100) {
           return false;
         }
       }
     }
-  } // Normalize day and check date validity
+  }
 
-
+  // Normalize day and check date validity
   if (day > 60) {
     day -= 60;
   }
-
   if (day < 10) {
     day = "0".concat(day);
   }
-
   var date = "".concat(full_year, "/").concat(month, "/").concat(day);
-
   if (date.length === 8) {
     if (!(0, _isDate.default)(date, 'YY/MM/DD')) {
       return false;
@@ -34668,9 +35218,27 @@ function svSeCheck(tin) {
   } else if (!(0, _isDate.default)(date, 'YYYY/MM/DD')) {
     return false;
   }
-
   return algorithms.luhnCheck(tin.replace(/\W/, ''));
-} // Locale lookup objects
+}
+
+/**
+ * uk-UA validation function
+ * Verify TIN validity by calculating check (last) digit (variant of MOD 11)
+ */
+function ukUaCheck(tin) {
+  // Calculate check digit
+  var digits = tin.split('').map(function (a) {
+    return parseInt(a, 10);
+  });
+  var multipliers = [-1, 5, 7, 9, 4, 6, 10, 5, 7];
+  var checksum = 0;
+  for (var i = 0; i < multipliers.length; i++) {
+    checksum += digits[i] * multipliers[i];
+  }
+  return checksum % 11 === 10 ? digits[9] === 0 : digits[9] === checksum % 11;
+}
+
+// Locale lookup objects
 
 /*
  * Tax id regex formats for various locales
@@ -34678,8 +35246,6 @@ function svSeCheck(tin) {
  * Where not explicitly specified in DG-TAXUD document both
  * uppercase and lowercase letters are acceptable.
  */
-
-
 var taxIdFormat = {
   'bg-BG': /^\d{10}$/,
   'cs-CZ': /^\d{6}\/{0,1}\d{3,4}$/,
@@ -34692,6 +35258,7 @@ var taxIdFormat = {
   'en-GB': /^\d{10}$|^(?!GB|NK|TN|ZZ)(?![DFIQUV])[A-Z](?![DFIQUVO])[A-Z]\d{6}[ABCD ]$/i,
   'en-IE': /^\d{7}[A-W][A-IW]{0,1}$/i,
   'en-US': /^\d{2}[- ]{0,1}\d{7}$/,
+  'es-AR': /(20|23|24|27|30|33|34)[0-9]{8}[0-9]/,
   'es-ES': /^(\d{0,8}|[XYZKLM]\d{7})[A-HJ-NP-TV-Z]$/i,
   'et-EE': /^[1-6]\d{6}(00[1-9]|0[1-9][0-9]|[1-6][0-9]{2}|70[0-9]|710)\d$/,
   'fi-FI': /^\d{6}[-+A]\d{3}[0-9A-FHJ-NPR-Y]$/i,
@@ -34707,19 +35274,21 @@ var taxIdFormat = {
   'mt-MT': /^\d{3,7}[APMGLHBZ]$|^([1-8])\1\d{7}$/i,
   'nl-NL': /^\d{9}$/,
   'pl-PL': /^\d{10,11}$/,
-  'pt-BR': /(?:^\d{11}$)|(?:^\d{14}$)/,
+  'pt-BR': /(?:^\d{3}\.\d{3}\.\d{3}-\d{2}$)|(?:^\d{11}$)|(?:^[A-Z0-9]{12}\d{2}$)/i,
   'pt-PT': /^\d{9}$/,
   'ro-RO': /^\d{13}$/,
   'sk-SK': /^\d{6}\/{0,1}\d{3,4}$/,
   'sl-SI': /^[1-9]\d{7}$/,
-  'sv-SE': /^(\d{6}[-+]{0,1}\d{4}|(18|19|20)\d{6}[-+]{0,1}\d{4})$/
-}; // taxIdFormat locale aliases
-
+  'sv-SE': /^(\d{6}[-+]{0,1}\d{4}|(18|19|20)\d{6}[-+]{0,1}\d{4})$/,
+  'uk-UA': /^\d{10}$/
+};
+// taxIdFormat locale aliases
 taxIdFormat['lb-LU'] = taxIdFormat['fr-LU'];
 taxIdFormat['lt-LT'] = taxIdFormat['et-EE'];
 taxIdFormat['nl-BE'] = taxIdFormat['fr-BE'];
-taxIdFormat['fr-CA'] = taxIdFormat['en-CA']; // Algorithmic tax id check functions for various locales
+taxIdFormat['fr-CA'] = taxIdFormat['en-CA'];
 
+// Algorithmic tax id check functions for various locales
 var taxIdCheck = {
   'bg-BG': bgBgCheck,
   'cs-CZ': csCzCheck,
@@ -34731,6 +35300,7 @@ var taxIdCheck = {
   'en-CA': isCanadianSIN,
   'en-IE': enIeCheck,
   'en-US': enUsCheck,
+  'es-AR': esArCheck,
   'es-ES': esEsCheck,
   'et-EE': etEeCheck,
   'fi-FI': fiFiCheck,
@@ -34749,55 +35319,51 @@ var taxIdCheck = {
   'ro-RO': roRoCheck,
   'sk-SK': skSkCheck,
   'sl-SI': slSiCheck,
-  'sv-SE': svSeCheck
-}; // taxIdCheck locale aliases
-
+  'sv-SE': svSeCheck,
+  'uk-UA': ukUaCheck
+};
+// taxIdCheck locale aliases
 taxIdCheck['lb-LU'] = taxIdCheck['fr-LU'];
 taxIdCheck['lt-LT'] = taxIdCheck['et-EE'];
 taxIdCheck['nl-BE'] = taxIdCheck['fr-BE'];
-taxIdCheck['fr-CA'] = taxIdCheck['en-CA']; // Regexes for locales where characters should be omitted before checking format
+taxIdCheck['fr-CA'] = taxIdCheck['en-CA'];
 
+// Regexes for locales where characters should be omitted before checking format
 var allsymbols = /[-\\\/!@#$%\^&\*\(\)\+\=\[\]]+/g;
 var sanitizeRegexes = {
   'de-AT': allsymbols,
   'de-DE': /[\/\\]/g,
   'fr-BE': allsymbols
-}; // sanitizeRegexes locale aliases
-
+};
+// sanitizeRegexes locale aliases
 sanitizeRegexes['nl-BE'] = sanitizeRegexes['fr-BE'];
+
 /*
  * Validator function
  * Return true if the passed string is a valid tax identification number
  * for the specified locale.
  * Throw an error exception if the locale is not supported.
  */
-
 function isTaxID(str) {
   var locale = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'en-US';
-  (0, _assertString.default)(str); // Copy TIN to avoid replacement if sanitized
-
+  (0, _assertString.default)(str);
+  // Copy TIN to avoid replacement if sanitized
   var strcopy = str.slice(0);
-
   if (locale in taxIdFormat) {
     if (locale in sanitizeRegexes) {
       strcopy = strcopy.replace(sanitizeRegexes[locale], '');
     }
-
     if (!taxIdFormat[locale].test(strcopy)) {
       return false;
     }
-
     if (locale in taxIdCheck) {
       return taxIdCheck[locale](strcopy);
-    } // Fallthrough; not all locales have algorithmic checks
-
-
+    }
+    // Fallthrough; not all locales have algorithmic checks
     return true;
   }
-
   throw new Error("Invalid locale '".concat(locale, "'"));
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -34813,11 +35379,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isTime;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var default_time_options = {
   hourFormat: 'hour24',
   mode: 'default'
@@ -34825,20 +35388,41 @@ var default_time_options = {
 var formats = {
   hour24: {
     default: /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/,
-    withSeconds: /^([01]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/
+    withSeconds: /^([01]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/,
+    withOptionalSeconds: /^([01]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?$/
   },
   hour12: {
     default: /^(0?[1-9]|1[0-2]):([0-5][0-9]) (A|P)M$/,
-    withSeconds: /^(0?[1-9]|1[0-2]):([0-5][0-9]):([0-5][0-9]) (A|P)M$/
+    withSeconds: /^(0?[1-9]|1[0-2]):([0-5][0-9]):([0-5][0-9]) (A|P)M$/,
+    withOptionalSeconds: /^(0?[1-9]|1[0-2]):([0-5][0-9])(?::([0-5][0-9]))? (A|P)M$/
   }
 };
-
 function isTime(input, options) {
   options = (0, _merge.default)(options, default_time_options);
   if (typeof input !== 'string') return false;
   return formats[options.hourFormat][options.mode].test(input);
 }
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
+/***/ }),
+
+/***/ 7768:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = isULID;
+var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function isULID(str) {
+  (0, _assertString.default)(str);
+  return /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i.test(str);
+}
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -34854,41 +35438,47 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isURL;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
+var _checkHost = _interopRequireDefault(__nccwpck_require__(261));
+var _includesString = _interopRequireDefault(__nccwpck_require__(7817));
 var _isFQDN = _interopRequireDefault(__nccwpck_require__(5627));
-
 var _isIP = _interopRequireDefault(__nccwpck_require__(8253));
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
-function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-
-function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 /*
 options for isURL method
 
-require_protocol - if set as true isURL will return false if protocol is not present in the URL
-require_valid_protocol - isURL will check if the URL's protocol is present in the protocols option
-protocols - valid protocols can be modified with this option
-require_host - if set as false isURL will not check if host is present in the URL
-require_port - if set as true isURL will check if port is present in the URL
-allow_protocol_relative_urls - if set as true protocol relative URLs will be allowed
-validate_length - if set as false isURL will skip string length validation (IE maximum is 2083)
+protocols - valid protocols can be modified with this option.
+require_tld - If set to false isURL will not check if the URL's host includes a top-level domain.
+require_protocol - if set to true isURL will return false if protocol is not present in the URL.
+require_host - if set to false isURL will not check if host is present in the URL.
+require_port - if set to true isURL will check if port is present in the URL.
+require_valid_protocol - isURL will check if the URL's protocol is present in the protocols option.
+allow_underscores - if set to true, the validator will allow underscores in the URL.
+host_whitelist - if set to an array of strings or regexp, and the domain matches none of the strings
+                 defined in it, the validation fails.
+host_blacklist - if set to an array of strings or regexp, and the domain matches any of the strings
+                 defined in it, the validation fails.
+allow_trailing_dot - if set to true, the validator will allow the domain to end with
+                     a `.` character.
+allow_protocol_relative_urls - if set to true protocol relative URLs will be allowed.
+allow_fragments - if set to false isURL will return false if fragments are present.
+allow_query_components - if set to false isURL will return false if query components are present.
+disallow_auth - if set to true, the validator will fail if the URL contains an authentication
+                component, e.g. `http://username:password@example.com`
+validate_length - if set to false isURL will skip string length validation. `max_allowed_length`
+                  will be ignored if this is set as `false`.
+max_allowed_length - if set, isURL will not allow URLs longer than the specified value (default is
+                     2084 that IE maximum URL length).
 
 */
+
 var default_url_options = {
   protocols: ['http', 'https', 'ftp'],
   require_tld: true,
@@ -34901,119 +35491,160 @@ var default_url_options = {
   allow_protocol_relative_urls: false,
   allow_fragments: true,
   allow_query_components: true,
-  validate_length: true
+  validate_length: true,
+  max_allowed_length: 2084
 };
 var wrapped_ipv6 = /^\[([^\]]+)\](?::([0-9]+))?$/;
-
-function isRegExp(obj) {
-  return Object.prototype.toString.call(obj) === '[object RegExp]';
-}
-
-function checkHost(host, matches) {
-  for (var i = 0; i < matches.length; i++) {
-    var match = matches[i];
-
-    if (host === match || isRegExp(match) && match.test(host)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function isURL(url, options) {
   (0, _assertString.default)(url);
-
   if (!url || /[\s<>]/.test(url)) {
     return false;
   }
-
   if (url.indexOf('mailto:') === 0) {
     return false;
   }
-
   options = (0, _merge.default)(options, default_url_options);
-
-  if (options.validate_length && url.length >= 2083) {
+  if (options.validate_length && url.length > options.max_allowed_length) {
     return false;
   }
-
-  if (!options.allow_fragments && url.includes('#')) {
+  if (!options.allow_fragments && (0, _includesString.default)(url, '#')) {
     return false;
   }
-
-  if (!options.allow_query_components && (url.includes('?') || url.includes('&'))) {
+  if (!options.allow_query_components && ((0, _includesString.default)(url, '?') || (0, _includesString.default)(url, '&'))) {
     return false;
   }
-
   var protocol, auth, host, hostname, port, port_str, split, ipv6;
   split = url.split('#');
   url = split.shift();
   split = url.split('?');
   url = split.shift();
-  split = url.split('://');
 
-  if (split.length > 1) {
-    protocol = split.shift().toLowerCase();
-
+  // Replaced the 'split("://")' logic with a regex to match the protocol.
+  // This correctly identifies schemes like `javascript:` which don't use `//`.
+  // However, we need to be careful not to confuse authentication credentials (user:password@host)
+  // with protocols. A colon before an @ symbol might be part of auth, not a protocol separator.
+  var protocol_match = url.match(/^([a-z][a-z0-9+\-.]*):/i);
+  var had_explicit_protocol = false;
+  var cleanUpProtocol = function cleanUpProtocol(potential_protocol) {
+    had_explicit_protocol = true;
+    protocol = potential_protocol.toLowerCase();
     if (options.require_valid_protocol && options.protocols.indexOf(protocol) === -1) {
+      // The identified protocol is not in the allowed list.
       return false;
+    }
+
+    // Remove the protocol from the URL string.
+    return url.substring(protocol_match[0].length);
+  };
+  if (protocol_match) {
+    var potential_protocol = protocol_match[1];
+    var after_colon = url.substring(protocol_match[0].length);
+
+    // Check if what follows looks like authentication credentials (user:password@host)
+    // rather than a protocol. This happens when:
+    // 1. There's no `//` after the colon (protocols like `http://` have this)
+    // 2. There's an `@` symbol before any `/`
+    // 3. The part before `@` contains only valid auth characters (alphanumeric, -, _, ., %, :)
+    var starts_with_slashes = after_colon.slice(0, 2) === '//';
+    if (!starts_with_slashes) {
+      var first_slash_position = after_colon.indexOf('/');
+      var before_slash = first_slash_position === -1 ? after_colon : after_colon.substring(0, first_slash_position);
+      var at_position = before_slash.indexOf('@');
+      if (at_position !== -1) {
+        var before_at = before_slash.substring(0, at_position);
+        var valid_auth_regex = /^[a-zA-Z0-9\-_.%:]*$/;
+        var is_valid_auth = valid_auth_regex.test(before_at);
+
+        // Check if this contains URL-encoded content that could be malicious
+        // For example: javascript:%61%6c%65%72%74%28%31%29@example.com
+        // The encoded part decodes to: alert(1)
+        var has_encoded_content = /%[0-9a-fA-F]{2}/.test(before_at);
+        if (is_valid_auth && !has_encoded_content) {
+          // This looks like authentication (e.g., user:password@host), not a protocol
+          if (options.require_protocol) {
+            return false;
+          }
+
+          // Don't consume the colon; let the auth parsing handle it later
+        } else {
+          // This looks like a malicious protocol (e.g., javascript:alert();@host)
+          // or URL-encoded protocol handler (e.g., javascript:%61%6c%65%72%74%28%31%29@host)
+          url = cleanUpProtocol(potential_protocol);
+          if (url === false) {
+            return false;
+          }
+        }
+      } else {
+        // No @ symbol found. Check if this could be a port number instead of a protocol.
+        // If what's after the colon is numeric (or starts with a digit and contains only
+        // valid port characters until a path separator), it's likely hostname:port, not a protocol.
+        var looks_like_port = /^[0-9]/.test(after_colon);
+        if (looks_like_port) {
+          // This looks like hostname:port, not a protocol
+          if (options.require_protocol) {
+            return false;
+          }
+          // Don't consume anything; let it be parsed as hostname:port
+        } else {
+          // This is definitely a protocol
+          url = cleanUpProtocol(potential_protocol);
+          if (url === false) {
+            return false;
+          }
+        }
+      }
+    } else {
+      // Starts with '//', this is definitely a protocol like http://
+      url = cleanUpProtocol(potential_protocol);
+      if (url === false) {
+        return false;
+      }
     }
   } else if (options.require_protocol) {
     return false;
-  } else if (url.slice(0, 2) === '//') {
-    if (!options.allow_protocol_relative_urls) {
-      return false;
-    }
-
-    split[0] = url.slice(2);
   }
 
-  url = split.join('://');
-
+  // Handle leading '//' only as protocol-relative when there was NO explicit protocol.
+  // If there was an explicit protocol, '//' is the normal separator
+  // and should be stripped unconditionally.
+  if (url.slice(0, 2) === '//') {
+    if (!had_explicit_protocol && !options.allow_protocol_relative_urls) {
+      return false;
+    }
+    url = url.slice(2);
+  }
   if (url === '') {
     return false;
   }
-
   split = url.split('/');
   url = split.shift();
-
   if (url === '' && !options.require_host) {
     return true;
   }
-
   split = url.split('@');
-
   if (split.length > 1) {
     if (options.disallow_auth) {
       return false;
     }
-
     if (split[0] === '') {
       return false;
     }
-
     auth = split.shift();
-
     if (auth.indexOf(':') >= 0 && auth.split(':').length > 2) {
       return false;
     }
-
     var _auth$split = auth.split(':'),
-        _auth$split2 = _slicedToArray(_auth$split, 2),
-        user = _auth$split2[0],
-        password = _auth$split2[1];
-
+      _auth$split2 = _slicedToArray(_auth$split, 2),
+      user = _auth$split2[0],
+      password = _auth$split2[1];
     if (user === '' && password === '') {
       return false;
     }
   }
-
   hostname = split.join('@');
   port_str = null;
   ipv6 = null;
   var ipv6_match = hostname.match(wrapped_ipv6);
-
   if (ipv6_match) {
     host = '';
     ipv6 = ipv6_match[1];
@@ -35021,43 +35652,33 @@ function isURL(url, options) {
   } else {
     split = hostname.split(':');
     host = split.shift();
-
     if (split.length) {
       port_str = split.join(':');
     }
   }
-
   if (port_str !== null && port_str.length > 0) {
     port = parseInt(port_str, 10);
-
     if (!/^[0-9]+$/.test(port_str) || port <= 0 || port > 65535) {
       return false;
     }
   } else if (options.require_port) {
     return false;
   }
-
   if (options.host_whitelist) {
-    return checkHost(host, options.host_whitelist);
+    return (0, _checkHost.default)(host, options.host_whitelist);
   }
-
   if (host === '' && !options.require_host) {
     return true;
   }
-
   if (!(0, _isIP.default)(host) && !(0, _isFQDN.default)(host, options) && (!ipv6 || !(0, _isIP.default)(ipv6, 6))) {
     return false;
   }
-
   host = host || ipv6;
-
-  if (options.host_blacklist && checkHost(host, options.host_blacklist)) {
+  if (options.host_blacklist && (0, _checkHost.default)(host, options.host_blacklist)) {
     return false;
   }
-
   return true;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35073,26 +35694,30 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isUUID;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var uuid = {
-  1: /^[0-9A-F]{8}-[0-9A-F]{4}-1[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/i,
-  2: /^[0-9A-F]{8}-[0-9A-F]{4}-2[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/i,
-  3: /^[0-9A-F]{8}-[0-9A-F]{4}-3[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/i,
+  1: /^[0-9A-F]{8}-[0-9A-F]{4}-1[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+  2: /^[0-9A-F]{8}-[0-9A-F]{4}-2[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+  3: /^[0-9A-F]{8}-[0-9A-F]{4}-3[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
   4: /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
   5: /^[0-9A-F]{8}-[0-9A-F]{4}-5[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
-  all: /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i
+  6: /^[0-9A-F]{8}-[0-9A-F]{4}-6[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+  7: /^[0-9A-F]{8}-[0-9A-F]{4}-7[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+  8: /^[0-9A-F]{8}-[0-9A-F]{4}-8[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+  nil: /^00000000-0000-0000-0000-000000000000$/i,
+  max: /^ffffffff-ffff-ffff-ffff-ffffffffffff$/i,
+  loose: /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i,
+  // From https://github.com/uuidjs/uuid/blob/main/src/regex.js
+  all: /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i
 };
-
 function isUUID(str, version) {
   (0, _assertString.default)(str);
-  var pattern = uuid[![undefined, null].includes(version) ? version : 'all'];
-  return !!pattern && pattern.test(str);
+  if (version === undefined || version === null) {
+    version = 'all';
+  }
+  return version in uuid ? uuid[version].test(str) : false;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35108,16 +35733,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isUppercase;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isUppercase(str) {
   (0, _assertString.default)(str);
   return str === str.toUpperCase();
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35129,44 +35750,62 @@ module.exports["default"] = exports.default;
 "use strict";
 
 
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isVAT;
 exports.vatMatchers = void 0;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var algorithms = _interopRequireWildcard(__nccwpck_require__(4134));
-
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function _getRequireWildcardCache() { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var PT = function PT(str) {
-  var match = str.match(/^(PT)?(\d{9})$/);
-
+function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function _interopRequireWildcard(e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != _typeof(e) && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (var _t in e) "default" !== _t && {}.hasOwnProperty.call(e, _t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, _t)) && (i.get || i.set) ? o(f, _t, i) : f[_t] = e[_t]); return f; })(e, t); }
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var AU = function AU(str) {
+  var match = str.match(/^(AU)?(\d{11})$/);
   if (!match) {
     return false;
   }
+  // @see {@link https://abr.business.gov.au/Help/AbnFormat}
+  var weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+  str = str.replace(/^AU/, '');
+  var ABN = (parseInt(str.slice(0, 1), 10) - 1).toString() + str.slice(1);
+  var total = 0;
+  for (var i = 0; i < 11; i++) {
+    total += weights[i] * ABN.charAt(i);
+  }
+  return total !== 0 && total % 89 === 0;
+};
+var CH = function CH(str) {
+  // @see {@link https://www.ech.ch/de/ech/ech-0097/5.2.0}
+  var hasValidCheckNumber = function hasValidCheckNumber(digits) {
+    var lastDigit = digits.pop(); // used as check number
+    var weights = [5, 4, 3, 2, 7, 6, 5, 4];
+    var calculatedCheckNumber = (11 - digits.reduce(function (acc, el, idx) {
+      return acc + el * weights[idx];
+    }, 0) % 11) % 11;
+    return lastDigit === calculatedCheckNumber;
+  };
 
+  // @see {@link https://www.estv.admin.ch/estv/de/home/mehrwertsteuer/uid/mwst-uid-nummer.html}
+  return /^(CHE[- ]?)?(\d{9}|(\d{3}\.\d{3}\.\d{3})|(\d{3} \d{3} \d{3})) ?(TVA|MWST|IVA)?$/.test(str) && hasValidCheckNumber(str.match(/\d/g).map(function (el) {
+    return +el;
+  }));
+};
+var PT = function PT(str) {
+  var match = str.match(/^(PT)?(\d{9})$/);
+  if (!match) {
+    return false;
+  }
   var tin = match[2];
   var checksum = 11 - algorithms.reverseMultiplyAndSum(tin.split('').slice(0, 8).map(function (a) {
     return parseInt(a, 10);
   }), 9) % 11;
-
   if (checksum > 9) {
     return parseInt(tin[8], 10) === 0;
   }
-
   return checksum === parseInt(tin[8], 10);
 };
-
-var vatMatchers = {
+var vatMatchers = exports.vatMatchers = {
   /**
    * European Union VAT identification numbers
    */
@@ -35198,7 +35837,7 @@ var vatMatchers = {
     return /^(FI)?\d{8}$/.test(str);
   },
   FR: function FR(str) {
-    return /^(FR)?\w{2}\d{9}$/.test(str);
+    return /^(FR)([A-Z0-9]{2}\d{9})$/.test(str);
   },
   DE: function DE(str) {
     return /^(DE)?\d{9}$/.test(str);
@@ -35249,7 +35888,6 @@ var vatMatchers = {
   SE: function SE(str) {
     return /^(SE)?\d{12}$/.test(str);
   },
-
   /**
    * VAT numbers of non-EU countries
    */
@@ -35259,9 +35897,7 @@ var vatMatchers = {
   MK: function MK(str) {
     return /^(MK)?\d{13}$/.test(str);
   },
-  AU: function AU(str) {
-    return /^(AU)?\d{11}$/.test(str);
-  },
+  AU: AU,
   BY: function BY(str) {
     return /^(УНП )?\d{9}$/.test(str);
   },
@@ -35281,7 +35917,7 @@ var vatMatchers = {
     return /^(IL)?\d{9}$/.test(str);
   },
   KZ: function KZ(str) {
-    return /^(KZ)?\d{9}$/.test(str);
+    return /^(KZ)?\d{12}$/.test(str);
   },
   NZ: function NZ(str) {
     return /^(NZ)?\d{9}$/.test(str);
@@ -35307,9 +35943,7 @@ var vatMatchers = {
   RS: function RS(str) {
     return /^(RS)?\d{9}$/.test(str);
   },
-  CH: function CH(str) {
-    return /^(CH)?(\d{6}|\d{9}|(\d{3}.\d{3})|(\d{3}.\d{3}.\d{3}))(TVA|MWST|IVA)$/.test(str);
-  },
+  CH: CH,
   TR: function TR(str) {
     return /^(TR)?\d{10}$/.test(str);
   },
@@ -35322,7 +35956,6 @@ var vatMatchers = {
   UZ: function UZ(str) {
     return /^(UZ)?\d{9}$/.test(str);
   },
-
   /**
    * VAT numbers of Latin American countries
    */
@@ -35381,16 +36014,12 @@ var vatMatchers = {
     return /^(VE)?[J,G,V,E]{1}-(\d{9}|(\d{8}-\d{1}))$/.test(str);
   }
 };
-exports.vatMatchers = vatMatchers;
-
 function isVAT(str, countryCode) {
   (0, _assertString.default)(str);
   (0, _assertString.default)(countryCode);
-
   if (countryCode in vatMatchers) {
     return vatMatchers[countryCode](str);
   }
-
   throw new Error("Invalid country code: '".concat(countryCode, "'"));
 }
 
@@ -35406,20 +36035,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isVariableWidth;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _isFullWidth = __nccwpck_require__(2619);
-
 var _isHalfWidth = __nccwpck_require__(2176);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isVariableWidth(str) {
   (0, _assertString.default)(str);
   return _isFullWidth.fullWidth.test(str) && _isHalfWidth.halfWidth.test(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35435,23 +36058,17 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = isWhitelisted;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isWhitelisted(str, chars) {
   (0, _assertString.default)(str);
-
   for (var i = str.length - 1; i >= 0; i--) {
     if (chars.indexOf(str[i]) === -1) {
       return false;
     }
   }
-
   return true;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35467,18 +36084,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = ltrim;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function ltrim(str, chars) {
-  (0, _assertString.default)(str); // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#Escaping
-
+  (0, _assertString.default)(str);
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#Escaping
   var pattern = chars ? new RegExp("^[".concat(chars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "]+"), 'g') : /^\s+/g;
   return str.replace(pattern, '');
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35494,21 +36107,15 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = matches;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function matches(str, pattern, modifiers) {
   (0, _assertString.default)(str);
-
   if (Object.prototype.toString.call(pattern) !== '[object RegExp]') {
     pattern = new RegExp(pattern, modifiers);
   }
-
   return !!str.match(pattern);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35524,11 +36131,8 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = normalizeEmail;
-
 var _merge = _interopRequireDefault(__nccwpck_require__(9956));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 var default_normalize_email_options = {
   // The following options apply to all email addresses
   // Lowercases the local part of the email address.
@@ -35557,72 +36161,71 @@ var default_normalize_email_options = {
   // The following conversions are specific to Yandex
   // Lowercases the local part of the Yandex address (known to be case-insensitive)
   yandex_lowercase: true,
+  // all yandex domains are equal, this explicitly sets the domain to 'yandex.ru'
+  yandex_convert_yandexru: true,
   // The following conversions are specific to iCloud
   // Lowercases the local part of the iCloud address (known to be case-insensitive)
   icloud_lowercase: true,
   // Removes the subaddress (e.g. "+foo") from the email address
   icloud_remove_subaddress: true
-}; // List of domains used by iCloud
+};
 
-var icloud_domains = ['icloud.com', 'me.com']; // List of domains used by Outlook.com and its predecessors
+// List of domains used by iCloud
+var icloud_domains = ['icloud.com', 'me.com'];
+
+// List of domains used by Outlook.com and its predecessors
 // This list is likely incomplete.
 // Partial reference:
 // https://blogs.office.com/2013/04/17/outlook-com-gets-two-step-verification-sign-in-by-alias-and-new-international-domains/
+var outlookdotcom_domains = ['hotmail.at', 'hotmail.be', 'hotmail.ca', 'hotmail.cl', 'hotmail.co.il', 'hotmail.co.nz', 'hotmail.co.th', 'hotmail.co.uk', 'hotmail.com', 'hotmail.com.ar', 'hotmail.com.au', 'hotmail.com.br', 'hotmail.com.gr', 'hotmail.com.mx', 'hotmail.com.pe', 'hotmail.com.tr', 'hotmail.com.vn', 'hotmail.cz', 'hotmail.de', 'hotmail.dk', 'hotmail.es', 'hotmail.fr', 'hotmail.hu', 'hotmail.id', 'hotmail.ie', 'hotmail.in', 'hotmail.it', 'hotmail.jp', 'hotmail.kr', 'hotmail.lv', 'hotmail.my', 'hotmail.ph', 'hotmail.pt', 'hotmail.sa', 'hotmail.sg', 'hotmail.sk', 'live.be', 'live.co.uk', 'live.com', 'live.com.ar', 'live.com.mx', 'live.de', 'live.es', 'live.eu', 'live.fr', 'live.it', 'live.nl', 'msn.com', 'outlook.at', 'outlook.be', 'outlook.cl', 'outlook.co.il', 'outlook.co.nz', 'outlook.co.th', 'outlook.com', 'outlook.com.ar', 'outlook.com.au', 'outlook.com.br', 'outlook.com.gr', 'outlook.com.pe', 'outlook.com.tr', 'outlook.com.vn', 'outlook.cz', 'outlook.de', 'outlook.dk', 'outlook.es', 'outlook.fr', 'outlook.hu', 'outlook.id', 'outlook.ie', 'outlook.in', 'outlook.it', 'outlook.jp', 'outlook.kr', 'outlook.lv', 'outlook.my', 'outlook.ph', 'outlook.pt', 'outlook.sa', 'outlook.sg', 'outlook.sk', 'passport.com'];
 
-var outlookdotcom_domains = ['hotmail.at', 'hotmail.be', 'hotmail.ca', 'hotmail.cl', 'hotmail.co.il', 'hotmail.co.nz', 'hotmail.co.th', 'hotmail.co.uk', 'hotmail.com', 'hotmail.com.ar', 'hotmail.com.au', 'hotmail.com.br', 'hotmail.com.gr', 'hotmail.com.mx', 'hotmail.com.pe', 'hotmail.com.tr', 'hotmail.com.vn', 'hotmail.cz', 'hotmail.de', 'hotmail.dk', 'hotmail.es', 'hotmail.fr', 'hotmail.hu', 'hotmail.id', 'hotmail.ie', 'hotmail.in', 'hotmail.it', 'hotmail.jp', 'hotmail.kr', 'hotmail.lv', 'hotmail.my', 'hotmail.ph', 'hotmail.pt', 'hotmail.sa', 'hotmail.sg', 'hotmail.sk', 'live.be', 'live.co.uk', 'live.com', 'live.com.ar', 'live.com.mx', 'live.de', 'live.es', 'live.eu', 'live.fr', 'live.it', 'live.nl', 'msn.com', 'outlook.at', 'outlook.be', 'outlook.cl', 'outlook.co.il', 'outlook.co.nz', 'outlook.co.th', 'outlook.com', 'outlook.com.ar', 'outlook.com.au', 'outlook.com.br', 'outlook.com.gr', 'outlook.com.pe', 'outlook.com.tr', 'outlook.com.vn', 'outlook.cz', 'outlook.de', 'outlook.dk', 'outlook.es', 'outlook.fr', 'outlook.hu', 'outlook.id', 'outlook.ie', 'outlook.in', 'outlook.it', 'outlook.jp', 'outlook.kr', 'outlook.lv', 'outlook.my', 'outlook.ph', 'outlook.pt', 'outlook.sa', 'outlook.sg', 'outlook.sk', 'passport.com']; // List of domains used by Yahoo Mail
+// List of domains used by Yahoo Mail
 // This list is likely incomplete
+var yahoo_domains = ['rocketmail.com', 'yahoo.ca', 'yahoo.co.uk', 'yahoo.com', 'yahoo.de', 'yahoo.fr', 'yahoo.in', 'yahoo.it', 'ymail.com'];
 
-var yahoo_domains = ['rocketmail.com', 'yahoo.ca', 'yahoo.co.uk', 'yahoo.com', 'yahoo.de', 'yahoo.fr', 'yahoo.in', 'yahoo.it', 'ymail.com']; // List of domains used by yandex.ru
+// List of domains used by yandex.ru
+var yandex_domains = ['yandex.ru', 'yandex.ua', 'yandex.kz', 'yandex.com', 'yandex.by', 'ya.ru'];
 
-var yandex_domains = ['yandex.ru', 'yandex.ua', 'yandex.kz', 'yandex.com', 'yandex.by', 'ya.ru']; // replace single dots, but not multiple consecutive dots
-
+// replace single dots, but not multiple consecutive dots
 function dotsReplacer(match) {
   if (match.length > 1) {
     return match;
   }
-
   return '';
 }
-
 function normalizeEmail(email, options) {
   options = (0, _merge.default)(options, default_normalize_email_options);
   var raw_parts = email.split('@');
   var domain = raw_parts.pop();
   var user = raw_parts.join('@');
-  var parts = [user, domain]; // The domain is always lowercased, as it's case-insensitive per RFC 1035
+  var parts = [user, domain];
 
+  // The domain is always lowercased, as it's case-insensitive per RFC 1035
   parts[1] = parts[1].toLowerCase();
-
   if (parts[1] === 'gmail.com' || parts[1] === 'googlemail.com') {
     // Address is GMail
     if (options.gmail_remove_subaddress) {
       parts[0] = parts[0].split('+')[0];
     }
-
     if (options.gmail_remove_dots) {
       // this does not replace consecutive dots like example..email@gmail.com
       parts[0] = parts[0].replace(/\.+/g, dotsReplacer);
     }
-
     if (!parts[0].length) {
       return false;
     }
-
     if (options.all_lowercase || options.gmail_lowercase) {
       parts[0] = parts[0].toLowerCase();
     }
-
     parts[1] = options.gmail_convert_googlemaildotcom ? 'gmail.com' : parts[1];
   } else if (icloud_domains.indexOf(parts[1]) >= 0) {
     // Address is iCloud
     if (options.icloud_remove_subaddress) {
       parts[0] = parts[0].split('+')[0];
     }
-
     if (!parts[0].length) {
       return false;
     }
-
     if (options.all_lowercase || options.icloud_lowercase) {
       parts[0] = parts[0].toLowerCase();
     }
@@ -35631,11 +36234,9 @@ function normalizeEmail(email, options) {
     if (options.outlookdotcom_remove_subaddress) {
       parts[0] = parts[0].split('+')[0];
     }
-
     if (!parts[0].length) {
       return false;
     }
-
     if (options.all_lowercase || options.outlookdotcom_lowercase) {
       parts[0] = parts[0].toLowerCase();
     }
@@ -35645,11 +36246,9 @@ function normalizeEmail(email, options) {
       var components = parts[0].split('-');
       parts[0] = components.length > 1 ? components.slice(0, -1).join('-') : components[0];
     }
-
     if (!parts[0].length) {
       return false;
     }
-
     if (options.all_lowercase || options.yahoo_lowercase) {
       parts[0] = parts[0].toLowerCase();
     }
@@ -35657,16 +36256,13 @@ function normalizeEmail(email, options) {
     if (options.all_lowercase || options.yandex_lowercase) {
       parts[0] = parts[0].toLowerCase();
     }
-
-    parts[1] = 'yandex.ru'; // all yandex domains are equal, 1st preferred
+    parts[1] = options.yandex_convert_yandexru ? 'yandex.ru' : parts[1];
   } else if (options.all_lowercase) {
     // Any other address
     parts[0] = parts[0].toLowerCase();
   }
-
   return parts.join('@');
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35682,30 +36278,22 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = rtrim;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function rtrim(str, chars) {
   (0, _assertString.default)(str);
-
   if (chars) {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#Escaping
     var pattern = new RegExp("[".concat(chars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "]+$"), 'g');
     return str.replace(pattern, '');
-  } // Use a faster and more safe than regex trim method https://blog.stevenlevithan.com/archives/faster-trim-javascript
-
-
+  }
+  // Use a faster and more safe than regex trim method https://blog.stevenlevithan.com/archives/faster-trim-javascript
   var strIndex = str.length - 1;
-
   while (/\s/.test(str.charAt(strIndex))) {
     strIndex -= 1;
   }
-
   return str.slice(0, strIndex + 1);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35721,19 +36309,14 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = stripLow;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
 var _blacklist = _interopRequireDefault(__nccwpck_require__(2316));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function stripLow(str, keep_new_lines) {
   (0, _assertString.default)(str);
   var chars = keep_new_lines ? '\\x00-\\x09\\x0B\\x0C\\x0E-\\x1F\\x7F' : '\\x00-\\x1F\\x7F';
   return (0, _blacklist.default)(str, chars);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35749,21 +36332,15 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = toBoolean;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function toBoolean(str, strict) {
   (0, _assertString.default)(str);
-
   if (strict) {
     return str === '1' || /^true$/i.test(str);
   }
-
   return str !== '0' && !/^false$/i.test(str) && str !== '';
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35779,17 +36356,13 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = toDate;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function toDate(date) {
   (0, _assertString.default)(date);
   date = Date.parse(date);
   return !isNaN(date) ? new Date(date) : null;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35805,16 +36378,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = toFloat;
-
 var _isFloat = _interopRequireDefault(__nccwpck_require__(3158));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function toFloat(str) {
   if (!(0, _isFloat.default)(str)) return NaN;
   return parseFloat(str);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35830,16 +36399,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = toInt;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function toInt(str, radix) {
   (0, _assertString.default)(str);
   return parseInt(str, radix || 10);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35855,17 +36420,12 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = trim;
-
 var _rtrim = _interopRequireDefault(__nccwpck_require__(8213));
-
 var _ltrim = _interopRequireDefault(__nccwpck_require__(7622));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function trim(str, chars) {
   return (0, _rtrim.default)((0, _ltrim.default)(str, chars), chars);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35881,18 +36441,15 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = unescape;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function unescape(str) {
   (0, _assertString.default)(str);
-  return str.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x2F;/g, '/').replace(/&#x5C;/g, '\\').replace(/&#96;/g, '`').replace(/&amp;/g, '&'); // &amp; replacement has to be the last one to prevent
+  return str.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x2F;/g, '/').replace(/&#x5C;/g, '\\').replace(/&#96;/g, '`').replace(/&amp;/g, '&');
+  // &amp; replacement has to be the last one to prevent
   // bugs with intermediate strings containing escape sequences
   // See: https://github.com/validatorjs/validator.js/issues/1827
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -35911,7 +36468,6 @@ exports.iso7064Check = iso7064Check;
 exports.luhnCheck = luhnCheck;
 exports.reverseMultiplyAndSum = reverseMultiplyAndSum;
 exports.verhoeffCheck = verhoeffCheck;
-
 /**
  * Algorithmic validation functions
  * May be used as is or implemented in the workflow of other validators.
@@ -35924,29 +36480,24 @@ exports.verhoeffCheck = verhoeffCheck;
  */
 function iso7064Check(str) {
   var checkvalue = 10;
-
   for (var i = 0; i < str.length - 1; i++) {
     checkvalue = (parseInt(str[i], 10) + checkvalue) % 10 === 0 ? 10 * 2 % 11 : (parseInt(str[i], 10) + checkvalue) % 10 * 2 % 11;
   }
-
   checkvalue = checkvalue === 1 ? 0 : 11 - checkvalue;
   return checkvalue === parseInt(str[10], 10);
 }
+
 /*
  * Luhn (mod 10) validation function
  * Called with a string of numbers (incl. check digit)
  * to validate according to the Luhn algorithm.
  */
-
-
 function luhnCheck(str) {
   var checksum = 0;
   var second = false;
-
   for (var i = str.length - 1; i >= 0; i--) {
     if (second) {
       var product = parseInt(str[i], 10) * 2;
-
       if (product > 9) {
         // sum digits of product and add to checksum
         checksum += product.toString().split('').map(function (a) {
@@ -35960,47 +36511,40 @@ function luhnCheck(str) {
     } else {
       checksum += parseInt(str[i], 10);
     }
-
     second = !second;
   }
-
   return checksum % 10 === 0;
 }
+
 /*
  * Reverse TIN multiplication and summation helper function
  * Called with an array of single-digit integers and a base multiplier
  * to calculate the sum of the digits multiplied in reverse.
  * Normally used in variations of MOD 11 algorithmic checks.
  */
-
-
 function reverseMultiplyAndSum(digits, base) {
   var total = 0;
-
   for (var i = 0; i < digits.length; i++) {
     total += digits[i] * (base - i);
   }
-
   return total;
 }
+
 /*
  * Verhoeff validation helper function
  * Called with a string of numbers
  * to validate according to the Verhoeff algorithm.
  */
-
-
 function verhoeffCheck(str) {
   var d_table = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5], [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7], [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1], [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3], [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]];
-  var p_table = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]]; // Copy (to prevent replacement) and reverse
+  var p_table = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]];
 
+  // Copy (to prevent replacement) and reverse
   var str_copy = str.split('').reverse().join('');
   var checksum = 0;
-
   for (var i = 0; i < str_copy.length; i++) {
     checksum = d_table[checksum][p_table[i % 8][parseInt(str_copy[i], 10)]];
   }
-
   return checksum === 0;
 }
 
@@ -36016,26 +36560,43 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = assertString;
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
 function assertString(input) {
-  var isString = typeof input === 'string' || input instanceof String;
-
-  if (!isString) {
-    var invalidType = _typeof(input);
-
-    if (input === null) invalidType = 'null';else if (invalidType === 'object') invalidType = input.constructor.name;
-    throw new TypeError("Expected a string but received a ".concat(invalidType));
-  }
+  if (input === undefined || input === null) throw new TypeError("Expected a string but received a ".concat(input));
+  if (input.constructor.name !== 'String') throw new TypeError("Expected a string but received a ".concat(input.constructor.name));
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
 /***/ }),
 
-/***/ 5484:
+/***/ 261:
+/***/ ((module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = checkHost;
+function isRegExp(obj) {
+  return Object.prototype.toString.call(obj) === '[object RegExp]';
+}
+function checkHost(host, matches) {
+  for (var i = 0; i < matches.length; i++) {
+    var match = matches[i];
+    if (host === match || isRegExp(match) && match.test(host)) {
+      return true;
+    }
+  }
+  return false;
+}
+module.exports = exports.default;
+module.exports["default"] = exports.default;
+
+/***/ }),
+
+/***/ 2776:
 /***/ ((module, exports) => {
 
 "use strict";
@@ -36045,15 +36606,31 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = void 0;
-
 var includes = function includes(arr, val) {
   return arr.some(function (arrVal) {
     return val === arrVal;
   });
 };
+var _default = exports["default"] = includes;
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
-var _default = includes;
-exports["default"] = _default;
+/***/ }),
+
+/***/ 7817:
+/***/ ((module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+var includes = function includes(str, val) {
+  return str.indexOf(val) !== -1;
+};
+var _default = exports["default"] = includes;
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -36069,20 +36646,20 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = merge;
-
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function merge() {
   var obj = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var defaults = arguments.length > 1 ? arguments[1] : undefined;
-
+  if (_typeof(obj) !== 'object' || obj === null) {
+    obj = {};
+  }
   for (var key in defaults) {
     if (typeof obj[key] === 'undefined') {
       obj[key] = defaults[key];
     }
   }
-
   return obj;
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -36098,7 +36675,6 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = multilineRegexp;
-
 /**
  * Build RegExp object from an array
  * of multiple/multi-line regexp parts
@@ -36111,7 +36687,24 @@ function multilineRegexp(parts, flags) {
   var regexpAsStringLiteral = parts.join('');
   return new RegExp(regexpAsStringLiteral, flags);
 }
+module.exports = exports.default;
+module.exports["default"] = exports.default;
 
+/***/ }),
+
+/***/ 2404:
+/***/ ((module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = isNullOrUndefined;
+function isNullOrUndefined(value) {
+  return value === null || value === undefined;
+}
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -36127,9 +36720,7 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = toString;
-
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function toString(input) {
   if (_typeof(input) === 'object' && input !== null) {
     if (typeof input.toString === 'function') {
@@ -36140,10 +36731,8 @@ function toString(input) {
   } else if (input === null || typeof input === 'undefined' || isNaN(input) && !input.length) {
     input = '';
   }
-
   return String(input);
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
@@ -36159,32 +36748,30 @@ Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
 exports["default"] = whitelist;
-
 var _assertString = _interopRequireDefault(__nccwpck_require__(1420));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function whitelist(str, chars) {
   (0, _assertString.default)(str);
   return str.replace(new RegExp("[^".concat(chars, "]+"), 'g'), '');
 }
-
 module.exports = exports.default;
 module.exports["default"] = exports.default;
 
 /***/ }),
 
-/***/ 4240:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ 5653:
+/***/ ((module) => {
 
-module.exports = require(__nccwpck_require__.ab + "build/Release/cpufeatures.node")
+module.exports = eval("require")("../build/Release/cpufeatures.node");
+
 
 /***/ }),
 
-/***/ 9041:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ 9623:
+/***/ ((module) => {
 
-module.exports = require(__nccwpck_require__.ab + "lib/protocol/crypto/build/Release/sshcrypto.node")
+module.exports = eval("require")("./crypto/build/Release/sshcrypto.node");
+
 
 /***/ }),
 
@@ -36292,6 +36879,22 @@ module.exports = require("stream");
 
 /***/ }),
 
+/***/ 1576:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("string_decoder");
+
+/***/ }),
+
+/***/ 9512:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("timers");
+
+/***/ }),
+
 /***/ 4404:
 /***/ ((module) => {
 
@@ -36323,7 +36926,11 @@ module.exports = require("zlib");
 
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -36345,14 +36952,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.NodeSSH = exports.SSHError = void 0;
-const fs_1 = __importDefault(__nccwpck_require__(7147));
-const path_1 = __importDefault(__nccwpck_require__(1017));
-const make_dir_1 = __importDefault(__nccwpck_require__(9126));
-const is_stream_1 = __importDefault(__nccwpck_require__(1554));
-const shell_escape_1 = __importDefault(__nccwpck_require__(8741));
-const sb_scandir_1 = __importDefault(__nccwpck_require__(869));
-const sb_promise_queue_1 = __nccwpck_require__(3779);
 const assert_1 = __importStar(__nccwpck_require__(9491));
+const fs_1 = __importDefault(__nccwpck_require__(7147));
+const is_stream_1 = __importDefault(__nccwpck_require__(1554));
+const make_dir_1 = __importDefault(__nccwpck_require__(9126));
+const path_1 = __importDefault(__nccwpck_require__(1017));
+const sb_promise_queue_1 = __nccwpck_require__(3779);
+const sb_scandir_1 = __importDefault(__nccwpck_require__(869));
+const shell_escape_1 = __importDefault(__nccwpck_require__(8741));
 const ssh2_1 = __importDefault(__nccwpck_require__(5869));
 const DEFAULT_CONCURRENCY = 1;
 const DEFAULT_VALIDATE = (path) => !path_1.default.basename(path).startsWith('.');
@@ -36443,28 +37050,28 @@ class NodeSSH {
         return connection;
     }
     async connect(givenConfig) {
-        assert_1.default(givenConfig != null && typeof givenConfig === 'object', 'config must be a valid object');
+        (0, assert_1.default)(givenConfig != null && typeof givenConfig === 'object', 'config must be a valid object');
         const config = { ...givenConfig };
-        assert_1.default(config.username != null && typeof config.username === 'string', 'config.username must be a valid string');
+        (0, assert_1.default)(config.username != null && typeof config.username === 'string', 'config.username must be a valid string');
         if (config.host != null) {
-            assert_1.default(typeof config.host === 'string', 'config.host must be a valid string');
+            (0, assert_1.default)(typeof config.host === 'string', 'config.host must be a valid string');
         }
         else if (config.sock != null) {
-            assert_1.default(typeof config.sock === 'object', 'config.sock must be a valid object');
+            (0, assert_1.default)(typeof config.sock === 'object', 'config.sock must be a valid object');
         }
         else {
             throw new assert_1.AssertionError({ message: 'Either config.host or config.sock must be provided' });
         }
         if (config.privateKey != null || config.privateKeyPath != null) {
             if (config.privateKey != null) {
-                assert_1.default(typeof config.privateKey === 'string', 'config.privateKey must be a valid string');
-                assert_1.default(config.privateKeyPath == null, 'config.privateKeyPath must not be specified when config.privateKey is specified');
+                (0, assert_1.default)(typeof config.privateKey === 'string', 'config.privateKey must be a valid string');
+                (0, assert_1.default)(config.privateKeyPath == null, 'config.privateKeyPath must not be specified when config.privateKey is specified');
             }
             else if (config.privateKeyPath != null) {
-                assert_1.default(typeof config.privateKeyPath === 'string', 'config.privateKeyPath must be a valid string');
-                assert_1.default(config.privateKey == null, 'config.privateKey must not be specified when config.privateKeyPath is specified');
+                (0, assert_1.default)(typeof config.privateKeyPath === 'string', 'config.privateKeyPath must be a valid string');
+                (0, assert_1.default)(config.privateKey == null, 'config.privateKey must not be specified when config.privateKeyPath is specified');
             }
-            assert_1.default(config.passphrase == null || typeof config.passphrase === 'string', 'config.passphrase must be null or a valid string');
+            (0, assert_1.default)(config.passphrase == null || typeof config.passphrase === 'string', 'config.passphrase must be null or a valid string');
             if (config.privateKeyPath != null) {
                 // Must be an fs path
                 try {
@@ -36479,15 +37086,15 @@ class NodeSSH {
             }
         }
         else if (config.password != null) {
-            assert_1.default(typeof config.password === 'string', 'config.password must be a valid string');
+            (0, assert_1.default)(typeof config.password === 'string', 'config.password must be a valid string');
         }
         if (config.tryKeyboard != null) {
-            assert_1.default(typeof config.tryKeyboard === 'boolean', 'config.tryKeyboard must be a valid boolean');
+            (0, assert_1.default)(typeof config.tryKeyboard === 'boolean', 'config.tryKeyboard must be a valid boolean');
         }
         if (config.tryKeyboard) {
             const { password } = config;
             if (config.onKeyboardInteractive != null) {
-                assert_1.default(typeof config.onKeyboardInteractive === 'function', 'config.onKeyboardInteractive must be a valid function');
+                (0, assert_1.default)(typeof config.onKeyboardInteractive === 'function', 'config.onKeyboardInteractive must be a valid function');
             }
             else if (password != null) {
                 config.onKeyboardInteractive = (name, instructions, instructionsLang, prompts, finish) => {
@@ -36548,17 +37155,13 @@ class NodeSSH {
         });
     }
     async withShell(callback, options) {
-        assert_1.default(typeof callback === 'function', 'callback must be a valid function');
+        (0, assert_1.default)(typeof callback === 'function', 'callback must be a valid function');
         const shell = await this.requestShell(options);
         try {
             await callback(shell);
         }
         finally {
-            // Try to close gracefully
-            if (!shell.close()) {
-                // Destroy local socket if it doesn't work
-                shell.destroy();
-            }
+            shell.destroy();
         }
     }
     async requestSFTP() {
@@ -36577,7 +37180,7 @@ class NodeSSH {
         });
     }
     async withSFTP(callback) {
-        assert_1.default(typeof callback === 'function', 'callback must be a valid function');
+        (0, assert_1.default)(typeof callback === 'function', 'callback must be a valid function');
         const sftp = await this.requestSFTP();
         try {
             await callback(sftp);
@@ -36587,18 +37190,19 @@ class NodeSSH {
         }
     }
     async execCommand(givenCommand, options = {}) {
-        assert_1.default(typeof givenCommand === 'string', 'command must be a valid string');
-        assert_1.default(options != null && typeof options === 'object', 'options must be a valid object');
-        assert_1.default(options.cwd == null || typeof options.cwd === 'string', 'options.cwd must be a valid string');
-        assert_1.default(options.stdin == null || typeof options.stdin === 'string' || is_stream_1.default.readable(options.stdin), 'options.stdin must be a valid string or readable stream');
-        assert_1.default(options.execOptions == null || typeof options.execOptions === 'object', 'options.execOptions must be a valid object');
-        assert_1.default(options.encoding == null || typeof options.encoding === 'string', 'options.encoding must be a valid string');
-        assert_1.default(options.onChannel == null || typeof options.onChannel === 'function', 'options.onChannel must be a valid function');
-        assert_1.default(options.onStdout == null || typeof options.onStdout === 'function', 'options.onStdout must be a valid function');
-        assert_1.default(options.onStderr == null || typeof options.onStderr === 'function', 'options.onStderr must be a valid function');
+        (0, assert_1.default)(typeof givenCommand === 'string', 'command must be a valid string');
+        (0, assert_1.default)(options != null && typeof options === 'object', 'options must be a valid object');
+        (0, assert_1.default)(options.cwd == null || typeof options.cwd === 'string', 'options.cwd must be a valid string');
+        (0, assert_1.default)(options.stdin == null || typeof options.stdin === 'string' || is_stream_1.default.readable(options.stdin), 'options.stdin must be a valid string or readable stream');
+        (0, assert_1.default)(options.execOptions == null || typeof options.execOptions === 'object', 'options.execOptions must be a valid object');
+        (0, assert_1.default)(options.encoding == null || typeof options.encoding === 'string', 'options.encoding must be a valid string');
+        (0, assert_1.default)(options.onChannel == null || typeof options.onChannel === 'function', 'options.onChannel must be a valid function');
+        (0, assert_1.default)(options.onStdout == null || typeof options.onStdout === 'function', 'options.onStdout must be a valid function');
+        (0, assert_1.default)(options.onStderr == null || typeof options.onStderr === 'function', 'options.onStderr must be a valid function');
+        (0, assert_1.default)(options.noTrim == null || typeof options.noTrim === 'boolean', 'options.noTrim must be a boolean');
         let command = givenCommand;
         if (options.cwd) {
-            command = `cd ${shell_escape_1.default([options.cwd])} ; ${command}`;
+            command = `cd ${(0, shell_escape_1.default)([options.cwd])} ; ${command}`;
         }
         const connection = this.getConnection();
         const output = { stdout: [], stderr: [] };
@@ -36644,25 +37248,31 @@ class NodeSSH {
                     signal = signal_ !== null && signal_ !== void 0 ? signal_ : null;
                 });
                 channel.on('close', () => {
+                    let stdout = output.stdout.join('');
+                    let stderr = output.stderr.join('');
+                    if (options.noTrim !== true) {
+                        stdout = stdout.trim();
+                        stderr = stderr.trim();
+                    }
                     resolve({
                         code: code != null ? code : null,
                         signal: signal != null ? signal : null,
-                        stdout: output.stdout.join('').trim(),
-                        stderr: output.stderr.join('').trim(),
+                        stdout,
+                        stderr,
                     });
                 });
             });
         });
     }
     async exec(command, parameters, options = {}) {
-        assert_1.default(typeof command === 'string', 'command must be a valid string');
-        assert_1.default(Array.isArray(parameters), 'parameters must be a valid array');
-        assert_1.default(options != null && typeof options === 'object', 'options must be a valid object');
-        assert_1.default(options.stream == null || ['both', 'stdout', 'stderr'].includes(options.stream), 'options.stream must be one of both, stdout, stderr');
+        (0, assert_1.default)(typeof command === 'string', 'command must be a valid string');
+        (0, assert_1.default)(Array.isArray(parameters), 'parameters must be a valid array');
+        (0, assert_1.default)(options != null && typeof options === 'object', 'options must be a valid object');
+        (0, assert_1.default)(options.stream == null || ['both', 'stdout', 'stderr'].includes(options.stream), 'options.stream must be one of both, stdout, stderr');
         for (let i = 0, { length } = parameters; i < length; i += 1) {
-            assert_1.default(typeof parameters[i] === 'string', `parameters[${i}] must be a valid string`);
+            (0, assert_1.default)(typeof parameters[i] === 'string', `parameters[${i}] must be a valid string`);
         }
-        const completeCommand = `${command}${parameters.length > 0 ? ` ${shell_escape_1.default(parameters)}` : ''}`;
+        const completeCommand = `${command}${parameters.length > 0 ? ` ${(0, shell_escape_1.default)(parameters)}` : ''}`;
         const response = await this.execCommand(completeCommand, options);
         if (options.stream == null || options.stream === 'stdout') {
             if (response.stderr) {
@@ -36676,9 +37286,9 @@ class NodeSSH {
         return response;
     }
     async mkdir(path, method = 'sftp', givenSftp = null) {
-        assert_1.default(typeof path === 'string', 'path must be a valid string');
-        assert_1.default(typeof method === 'string' && (method === 'sftp' || method === 'exec'), 'method must be either sftp or exec');
-        assert_1.default(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
+        (0, assert_1.default)(typeof path === 'string', 'path must be a valid string');
+        (0, assert_1.default)(typeof method === 'string' && (method === 'sftp' || method === 'exec'), 'method must be either sftp or exec');
+        (0, assert_1.default)(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
         if (method === 'exec') {
             await this.exec('mkdir', ['-p', unixifyPath(path)]);
             return;
@@ -36701,10 +37311,10 @@ class NodeSSH {
         }
     }
     async getFile(localFile, remoteFile, givenSftp = null, transferOptions = null) {
-        assert_1.default(typeof localFile === 'string', 'localFile must be a valid string');
-        assert_1.default(typeof remoteFile === 'string', 'remoteFile must be a valid string');
-        assert_1.default(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
-        assert_1.default(transferOptions == null || typeof transferOptions === 'object', 'transferOptions must be a valid object');
+        (0, assert_1.default)(typeof localFile === 'string', 'localFile must be a valid string');
+        (0, assert_1.default)(typeof remoteFile === 'string', 'remoteFile must be a valid string');
+        (0, assert_1.default)(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
+        (0, assert_1.default)(transferOptions == null || typeof transferOptions === 'object', 'transferOptions must be a valid object');
         const sftp = givenSftp || (await this.requestSFTP());
         try {
             await new Promise((resolve, reject) => {
@@ -36725,11 +37335,11 @@ class NodeSSH {
         }
     }
     async putFile(localFile, remoteFile, givenSftp = null, transferOptions = null) {
-        assert_1.default(typeof localFile === 'string', 'localFile must be a valid string');
-        assert_1.default(typeof remoteFile === 'string', 'remoteFile must be a valid string');
-        assert_1.default(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
-        assert_1.default(transferOptions == null || typeof transferOptions === 'object', 'transferOptions must be a valid object');
-        assert_1.default(await new Promise((resolve) => {
+        (0, assert_1.default)(typeof localFile === 'string', 'localFile must be a valid string');
+        (0, assert_1.default)(typeof remoteFile === 'string', 'remoteFile must be a valid string');
+        (0, assert_1.default)(givenSftp == null || typeof givenSftp === 'object', 'sftp must be a valid object');
+        (0, assert_1.default)(transferOptions == null || typeof transferOptions === 'object', 'transferOptions must be a valid object');
+        (0, assert_1.default)(await new Promise((resolve) => {
             fs_1.default.access(localFile, fs_1.default.constants.R_OK, (err) => {
                 resolve(err === null);
             });
@@ -36761,12 +37371,12 @@ class NodeSSH {
         }
     }
     async putFiles(files, { concurrency = DEFAULT_CONCURRENCY, sftp: givenSftp = null, transferOptions = {} } = {}) {
-        assert_1.default(Array.isArray(files), 'files must be an array');
+        (0, assert_1.default)(Array.isArray(files), 'files must be an array');
         for (let i = 0, { length } = files; i < length; i += 1) {
             const file = files[i];
-            assert_1.default(file, 'files items must be valid objects');
-            assert_1.default(file.local && typeof file.local === 'string', `files[${i}].local must be a string`);
-            assert_1.default(file.remote && typeof file.remote === 'string', `files[${i}].remote must be a string`);
+            (0, assert_1.default)(file, 'files items must be valid objects');
+            (0, assert_1.default)(file.local && typeof file.local === 'string', `files[${i}].local must be a string`);
+            (0, assert_1.default)(file.remote && typeof file.remote === 'string', `files[${i}].remote must be a string`);
         }
         const transferred = [];
         const sftp = givenSftp || (await this.requestSFTP());
@@ -36797,17 +37407,17 @@ class NodeSSH {
         }
     }
     async putDirectory(localDirectory, remoteDirectory, { concurrency = DEFAULT_CONCURRENCY, sftp: givenSftp = null, transferOptions = {}, recursive = true, tick = DEFAULT_TICK, validate = DEFAULT_VALIDATE, } = {}) {
-        assert_1.default(typeof localDirectory === 'string' && localDirectory, 'localDirectory must be a string');
-        assert_1.default(typeof remoteDirectory === 'string' && remoteDirectory, 'remoteDirectory must be a string');
+        (0, assert_1.default)(typeof localDirectory === 'string' && localDirectory, 'localDirectory must be a string');
+        (0, assert_1.default)(typeof remoteDirectory === 'string' && remoteDirectory, 'remoteDirectory must be a string');
         const localDirectoryStat = await new Promise((resolve) => {
             fs_1.default.stat(localDirectory, (err, stat) => {
                 resolve(stat || null);
             });
         });
-        assert_1.default(localDirectoryStat != null, `localDirectory does not exist at ${localDirectory}`);
-        assert_1.default(localDirectoryStat.isDirectory(), `localDirectory is not a directory at ${localDirectory}`);
+        (0, assert_1.default)(localDirectoryStat != null, `localDirectory does not exist at ${localDirectory}`);
+        (0, assert_1.default)(localDirectoryStat.isDirectory(), `localDirectory is not a directory at ${localDirectory}`);
         const sftp = givenSftp || (await this.requestSFTP());
-        const scanned = await sb_scandir_1.default(localDirectory, {
+        const scanned = await (0, sb_scandir_1.default)(localDirectory, {
             recursive,
             validate,
         });
@@ -36859,17 +37469,17 @@ class NodeSSH {
         return !failed;
     }
     async getDirectory(localDirectory, remoteDirectory, { concurrency = DEFAULT_CONCURRENCY, sftp: givenSftp = null, transferOptions = {}, recursive = true, tick = DEFAULT_TICK, validate = DEFAULT_VALIDATE, } = {}) {
-        assert_1.default(typeof localDirectory === 'string' && localDirectory, 'localDirectory must be a string');
-        assert_1.default(typeof remoteDirectory === 'string' && remoteDirectory, 'remoteDirectory must be a string');
+        (0, assert_1.default)(typeof localDirectory === 'string' && localDirectory, 'localDirectory must be a string');
+        (0, assert_1.default)(typeof remoteDirectory === 'string' && remoteDirectory, 'remoteDirectory must be a string');
         const localDirectoryStat = await new Promise((resolve) => {
             fs_1.default.stat(localDirectory, (err, stat) => {
                 resolve(stat || null);
             });
         });
-        assert_1.default(localDirectoryStat != null, `localDirectory does not exist at ${localDirectory}`);
-        assert_1.default(localDirectoryStat.isDirectory(), `localDirectory is not a directory at ${localDirectory}`);
+        (0, assert_1.default)(localDirectoryStat != null, `localDirectory does not exist at ${localDirectory}`);
+        (0, assert_1.default)(localDirectoryStat.isDirectory(), `localDirectory is not a directory at ${localDirectory}`);
         const sftp = givenSftp || (await this.requestSFTP());
-        const scanned = await sb_scandir_1.default(remoteDirectory, {
+        const scanned = await (0, sb_scandir_1.default)(remoteDirectory, {
             recursive,
             validate,
             concurrency,
@@ -36919,7 +37529,7 @@ class NodeSSH {
                 directories.forEach((directory) => {
                     queue
                         .add(async () => {
-                        await make_dir_1.default(path_1.default.join(localDirectory, directory));
+                        await (0, make_dir_1.default)(path_1.default.join(localDirectory, directory));
                     })
                         .catch(reject);
                 });
@@ -37322,7 +37932,7 @@ exports["default"] = scanDirectory;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"1.14.0"};
+module.exports = {"i8":"1.17.0"};
 
 /***/ })
 
