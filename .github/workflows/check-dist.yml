@@ -16,20 +16,25 @@ on:
       - "**.md"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check-dist:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Set Node.js 20.x
-        uses: actions/setup-node@v4.0.2
+      - name: Set Node.js 24.x
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 20.x
+          node-version: 24.x
+          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # --ignore-scripts keeps native addons out of dist/, so the build is the same on every platform
+        run: npm ci --ignore-scripts
 
       - name: Rebuild the dist/ directory
         run: |
@@ -46,7 +51,7 @@ jobs:
         id: diff
 
       # If index.js was different than expected, upload the expected version as an artifact
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: ${{ failure() && steps.diff.conclusion == 'failure' }}
         with:
           name: dist

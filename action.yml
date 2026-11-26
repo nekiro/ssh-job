@@ -34,7 +34,7 @@ inputs:
     description: "Allocate a pseudo-terminal (TTY) for the SSH command"
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/index.js"
 
 branding:
