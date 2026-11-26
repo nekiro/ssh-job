@@ -1,4 +1,3 @@
-import "./cjsGlobals.js";
 import * as core from "@actions/core";
 import {ConfigManager} from "./ConfigManager.js";
 import {NodeSSH, Config, SSHExecCommandOptions} from "node-ssh";
