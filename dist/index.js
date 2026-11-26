@@ -26031,7 +26031,7 @@ const normalizeFingerprint = (fingerprint) => {
 const matchesFingerprint = (hostKey, expected) => {
 	return normalizeFingerprint(getFingerprint(hostKey)) === normalizeFingerprint(expected);
 };
-// src/main.ts
+// src/run.ts
 const SHELL = "bash --noprofile --norc";
 async function run() {
 	const ssh = new NodeSSH();
@@ -26112,5 +26112,6 @@ async function run() {
 		ssh.dispose();
 	}
 }
+// src/main.ts
 run();
 export {};
