@@ -1,0 +1,135 @@
+name: "integration"
+
+# Runs the action from dist/ against the sshd of the runner itself.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ssh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Start sshd and create a key
+        id: sshd
+        run: |
+          sudo apt-get install -y -q openssh-server
+          sudo ssh-keygen -A
+          sudo systemctl start ssh
+
+          mkdir -p ~/.ssh
+          ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/id_ed25519"
+          cat "$RUNNER_TEMP/id_ed25519.pub" >> ~/.ssh/authorized_keys
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/authorized_keys
+          chmod go-w ~
+
+          {
+            echo "user=$(whoami)"
+            echo "fingerprint=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}')"
+            echo "key<<KEY_EOF"
+            cat "$RUNNER_TEMP/id_ed25519"
+            echo "KEY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run commands with envs
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: ${{ steps.sshd.outputs.fingerprint }}
+          envs: '{"GREETING": "it''s $(id) fine", "NUM": 42, "OUT": "${{ runner.temp }}/plain.txt"}'
+          command: |
+            echo "greeting=$GREETING num=$NUM" > "$OUT"
+            if [ -t 1 ]; then echo "unexpected tty"; exit 1; fi
+
+      - name: Check the result
+        run: test "$(cat "$RUNNER_TEMP/plain.txt")" = "greeting=it's \$(id) fine num=42"
+
+      - name: Run commands with tty
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: ${{ steps.sshd.outputs.fingerprint }}
+          tty: true
+          envs: '{"GREETING": "it''s $(id) fine", "OUT": "${{ runner.temp }}/tty.txt"}'
+          command: |
+            test -t 0
+            test -t 1
+            echo "greeting=$GREETING args=$#" > "$OUT"
+
+      - name: Check the tty result
+        run: test "$(cat "$RUNNER_TEMP/tty.txt")" = "greeting=it's \$(id) fine args=0"
+
+      - name: Failing command
+        id: failing
+        continue-on-error: true
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: ${{ steps.sshd.outputs.fingerprint }}
+          command: |
+            false
+            touch "${{ runner.temp }}/after-failure"
+
+      - name: Failing command with tty
+        id: failing-tty
+        continue-on-error: true
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: ${{ steps.sshd.outputs.fingerprint }}
+          tty: true
+          command: exit 3
+
+      - name: Wrong fingerprint
+        id: fingerprint
+        continue-on-error: true
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          command: touch "${{ runner.temp }}/wrong-fingerprint"
+
+      - name: Command timeout
+        id: timeout
+        continue-on-error: true
+        uses: ./
+        with:
+          host: 127.0.0.1
+          user: ${{ steps.sshd.outputs.user }}
+          key: ${{ steps.sshd.outputs.key }}
+          fingerprint: ${{ steps.sshd.outputs.fingerprint }}
+          timeout: 2
+          command: sleep 60
+
+      - name: Check the failures
+        env:
+          FAILING: ${{ steps.failing.outcome }}
+          FAILING_TTY: ${{ steps.failing-tty.outcome }}
+          FINGERPRINT: ${{ steps.fingerprint.outcome }}
+          TIMEOUT: ${{ steps.timeout.outcome }}
+        run: |
+          test "$FAILING" = "failure"
+          test "$FAILING_TTY" = "failure"
+          test "$FINGERPRINT" = "failure"
+          test "$TIMEOUT" = "failure"
+          test ! -e "$RUNNER_TEMP/after-failure"
+          test ! -e "$RUNNER_TEMP/wrong-fingerprint"

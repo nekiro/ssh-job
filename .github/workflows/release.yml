@@ -1,0 +1,46 @@
+name: "release"
+
+# When a release vX.Y.Z is published, checks that dist/ matches the sources
+# and moves the major tag (vX) to it, so `uses: nekiro/ssh-job@vX` gets the update.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  major-tag:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Check that dist/ is up to date
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm run package
+          if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
+            echo "dist/ does not match the sources, rebuild it and release again"
+            git diff --stat
+            exit 1
+          fi
+
+      - name: Move the major tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag $TAG is not in the vX.Y.Z format, major tag is not moved"
+            exit 0
+          fi
+
+          major="${TAG%%.*}"
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"
