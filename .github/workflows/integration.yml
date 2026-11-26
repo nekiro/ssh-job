@@ -32,6 +32,11 @@ jobs:
           chmod 600 ~/.ssh/authorized_keys
           chmod go-w ~
 
+          # keep the private key out of the log, the inputs of every step below are printed there
+          while read -r line; do
+            echo "::add-mask::$line"
+          done < "$RUNNER_TEMP/id_ed25519"
+
           {
             echo "user=$(whoami)"
             echo "fingerprint=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}')"
