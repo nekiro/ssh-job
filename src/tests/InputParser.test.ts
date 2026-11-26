@@ -48,6 +48,8 @@ describe("InputParser", () => {
 		{input: "foo,bar,baz", output: ["foo", "bar", "baz"]},
 		{input: "bar, foo, baz", output: ["bar", "foo", "baz"]},
 		{input: "bar", output: ["bar"]},
+		{input: "", output: []},
+		{input: "foo,,bar,", output: ["foo", "bar"]},
 	])("getStringArray should return proper output for given input", ({input, output}) => {
 		//given
 		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
@@ -76,6 +78,15 @@ describe("InputParser", () => {
 		expect(result).toBe(output ?? defautValue);
 	});
 
+	test.each(["yes", "True", "2"])("getBoolean should throw exception for %j", input => {
+		//given
+		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+
+		//when
+		//then
+		expect(() => InputParser.getBoolean("foo")).toThrow(Error);
+	});
+
 	test.each([
 		{input: "123", output: 123},
 		{input: "5555", output: 5555},
@@ -88,5 +99,14 @@ describe("InputParser", () => {
 
 		//then
 		expect(result).toBe(output);
+	});
+
+	test.each(["abc", "22abc", "1.5"])("getNumber should throw exception for %j", input => {
+		//given
+		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+
+		//when
+		//then
+		expect(() => InputParser.getNumber("foo")).toThrow(Error);
 	});
 });

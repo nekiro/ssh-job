@@ -10,36 +10,39 @@ export class InputParser {
 		return core.getInput(name);
 	};
 
-	public static getJsonFormatted = (name: string): object => {
+	public static getJsonFormatted = (name: string): Record<string, unknown> => {
 		const value = core.getInput(name);
-		let parsed: object = {};
 
-		if (value.length !== 0) {
-			parsed = JSON.parse(value);
+		if (value.length === 0) {
+			return {};
 		}
 
-		return parsed;
+		const parsed: unknown = JSON.parse(value);
+
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+			throw Error(`Invalid argument value for ${name}, pass a json object`);
+		}
+
+		return parsed as Record<string, unknown>;
 	};
 
 	public static getStringArray = (name: string): string[] => {
-		const value = core.getInput(name).replace(/\s/g, "");
-
-		const envs = value.split(",");
-
-		if (value.length !== 0 && envs.length === 0) {
-			throw Error(`Invalid argument value for ${name}, pass comma separated string ex. something,something`);
-		}
-
-		return envs;
+		return core
+			.getInput(name)
+			.split(",")
+			.map(entry => entry.trim())
+			.filter(entry => entry.length !== 0);
 	};
 
-	public static getBoolean = (name: string, defaultValue?: boolean): boolean => {
-		let value = core.getInput(name);
+	public static getBoolean = (name: string, defaultValue = false): boolean => {
+		const value = core.getInput(name);
 
-		if (value.length !== 0 && !validator.isBoolean(value, {loose: false})) {
+		if (value.length === 0) {
+			return defaultValue;
+		}
+
+		if (!validator.isBoolean(value, {loose: false})) {
 			throw Error(`Invalid argument value for ${name}`);
-		} else if (value.length === 0 && defaultValue) {
-			value = String(defaultValue);
 		}
 
 		return validator.toBoolean(value, true);
@@ -48,7 +51,11 @@ export class InputParser {
 	public static getNumber = (name: string): number => {
 		const value = core.getInput(name);
 
-		if (value.length !== 0 && !validator.isInt(value)) {
+		if (value.length === 0) {
+			return Number.NaN;
+		}
+
+		if (!validator.isInt(value)) {
 			throw Error(`Invalid argument value for ${name}`);
 		}
 
