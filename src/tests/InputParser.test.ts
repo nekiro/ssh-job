@@ -13,7 +13,7 @@ describe("InputParser", () => {
 
 		//then
 		expect(result).toStrictEqual(mockResponse);
-		expect(getMultilineInputMock).toBeCalledWith(mockName);
+		expect(getMultilineInputMock).toHaveBeenCalledWith(mockName);
 	});
 
 	test("getString should call core.getInput with given name and return what core.getInput returns", () => {
@@ -27,7 +27,7 @@ describe("InputParser", () => {
 
 		//then
 		expect(result).toStrictEqual(mockResponse);
-		expect(getInputMock).toBeCalledWith(mockName);
+		expect(getInputMock).toHaveBeenCalledWith(mockName);
 	});
 
 	test.each([

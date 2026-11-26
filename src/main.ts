@@ -114,7 +114,7 @@ async function run(): Promise<void> {
 							reject(new Error(`Command timed out after ${config.timeout} seconds`));
 						}, config.timeout * 1000);
 					}),
-			  ]).finally(() => clearTimeout(timer)));
+				]).finally(() => clearTimeout(timer)));
 
 		if (!sawStdout && response.stdout) {
 			core.info(response.stdout);
