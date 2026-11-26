@@ -1,7 +1,14 @@
 import * as core from "@actions/core";
 import validator from "validator";
 
-/** Reads an input that holds a json object, an empty input gives an empty object. */
+const isJsonObject = (value: unknown): value is Record<string, unknown> => {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+/**
+ * Reads an input that holds a json object, or a json array of objects that are merged into one.
+ * In an array a later object wins when the same key is in more than one. An empty input gives an empty object.
+ */
 export const getJsonInput = (name: string): Record<string, unknown> => {
 	const value = core.getInput(name);
 
@@ -10,12 +17,13 @@ export const getJsonInput = (name: string): Record<string, unknown> => {
 	}
 
 	const parsed: unknown = JSON.parse(value);
+	const objects = Array.isArray(parsed) ? parsed : [parsed];
 
-	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-		throw Error(`Invalid argument value for ${name}, pass a json object`);
+	if (!objects.every(isJsonObject)) {
+		throw Error(`Invalid argument value for ${name}, pass a json object or an array of json objects`);
 	}
 
-	return parsed as Record<string, unknown>;
+	return Object.fromEntries(objects.flatMap(object => Object.entries(object)));
 };
 
 /** Reads an input that holds a comma separated list. */

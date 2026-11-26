@@ -52,13 +52,17 @@ jobs:
           user: ${{ steps.sshd.outputs.user }}
           key: ${{ steps.sshd.outputs.key }}
           fingerprint: ${{ steps.sshd.outputs.fingerprint }}
-          envs: '{"GREETING": "it''s $(id) fine", "NUM": 42, "OUT": "${{ runner.temp }}/plain.txt"}'
+          envs: |
+            [
+              {"REGION": "eu-west", "NUM": 1},
+              {"GREETING": "it's $(id) fine", "NUM": 42, "OUT": "${{ runner.temp }}/plain.txt"}
+            ]
           command: |
-            echo "greeting=$GREETING num=$NUM" > "$OUT"
+            echo "greeting=$GREETING num=$NUM region=$REGION" > "$OUT"
             if [ -t 1 ]; then echo "unexpected tty"; exit 1; fi
 
       - name: Check the result
-        run: test "$(cat "$RUNNER_TEMP/plain.txt")" = "greeting=it's \$(id) fine num=42"
+        run: test "$(cat "$RUNNER_TEMP/plain.txt")" = "greeting=it's \$(id) fine num=42 region=eu-west"
 
       - name: Run commands with tty
         uses: ./

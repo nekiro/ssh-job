@@ -19,7 +19,7 @@ Commands are executed by `bash --noprofile --norc -c 'source /dev/stdin'` with `
 | passphrase          |   n/a   |  false   | Passphrase used to decrypt key                                                                               |
 | password            |   n/a   |  false   | Password used for authorization, required when key is not set                                                |
 | fingerprint         |   n/a   |  false   | SHA256 fingerprint of the server host key, the connection is rejected when it does not match                 |
-| envs                |   n/a   |  false   | Json serialized secrets exported to shell                                                                    |
+| envs                |   n/a   |  false   | Json object, or json array of objects, with variables exported to shell                                      |
 | ignoredEnvs         |   n/a   |  false   | List of comma separated envs to ignore when exporting to shell                                               |
 | command             |   n/a   |   true   | Command/s or script to execute                                                                               |
 | exportActionOptions |  false  |  false   | Export action options, this is handy when you want to access HOST, USER or any other options in shell script |
@@ -87,6 +87,22 @@ Names of envs can contain only letters, digits and underscores. Values that are 
     envs: ${{ toJson(secrets) }}
     command: mkdir $DIRECTORY
 ```
+
+Values that do not have to be hidden can be kept in [configuration variables](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-variables) instead of secrets. To pass both, give `envs` a json array. The objects are merged in the given order, so when a variable and a secret have the same name, the one from the later object is used.
+
+```yml
+- name: deploy
+  uses: nekiro/ssh-job@v2
+  with:
+    host: ${{ vars.HOST }}
+    user: ${{ vars.USER }}
+    key: ${{ secrets.KEY }}
+    envs: |
+      [${{ toJson(vars) }}, ${{ toJson(secrets) }}]
+    command: ./deploy.sh "$REGION" "$API_TOKEN"
+```
+
+The array can also hold your own values, ex. `[${{ toJson(vars) }}, {"VERSION": "${{ github.sha }}"}]`.
 
 ## Contribution
 

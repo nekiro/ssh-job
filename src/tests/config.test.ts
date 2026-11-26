@@ -207,6 +207,33 @@ describe("loadConfig", () => {
 			expect(loadConfig().envs).toStrictEqual([]);
 		});
 
+		test("should merge an array of objects, a later object wins on the same name", () => {
+			//given
+			const vars = {REGION: "eu-west", SHARED: "from vars", REPLICAS: 3, HOST: "h"};
+			const secrets = {TOKEN: "secret", SHARED: "from secrets", SKIPPED: "x"};
+			mockInputs({...validInputs, envs: JSON.stringify([vars, secrets]), ignoredEnvs: "SKIPPED"});
+
+			//when
+			const config = loadConfig();
+
+			//then
+			expect(config.envs).toStrictEqual([
+				{key: "REGION", value: "eu-west"},
+				{key: "SHARED", value: "from secrets"},
+				{key: "REPLICAS", value: "3"},
+				{key: "TOKEN", value: "secret"},
+			]);
+		});
+
+		test("should throw exception if an object of the array has an invalid env name", () => {
+			//given
+			mockInputs({...validInputs, envs: JSON.stringify([{FOO: "foo"}, {"FOO;reboot": "x"}])});
+
+			//when
+			//then
+			expect(() => loadConfig()).toThrow("Invalid env name");
+		});
+
 		test.each(["not json", "[1,2]", '"text"', "null"])("should throw exception if envs is %j", envs => {
 			//given
 			mockInputs({...validInputs, envs});

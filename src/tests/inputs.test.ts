@@ -18,6 +18,9 @@ describe("inputs", () => {
 			{input: JSON.stringify({one: "1", two: 2}), output: {one: "1", two: 2}},
 			{input: JSON.stringify({foo: "foo", bar: true}), output: {foo: "foo", bar: true}},
 			{input: "", output: {}},
+			{input: "[]", output: {}},
+			{input: JSON.stringify([{a: 1, b: 1}, {b: 2, c: 2}, {}]), output: {a: 1, b: 2, c: 2}},
+			{input: JSON.stringify([{a: null}]), output: {a: null}},
 		])("should return $output for $input", ({input, output}) => {
 			//given
 			mockInput(input);
@@ -30,14 +33,17 @@ describe("inputs", () => {
 			expect(core.getInput).toHaveBeenCalledWith("foo");
 		});
 
-		test.each(["not json", "[1,2]", '"text"', "null", "5"])("should throw exception for %j", input => {
-			//given
-			mockInput(input);
+		test.each(["not json", "[1,2]", '"text"', "null", "5", "[{}, null]", "[[{}]]", '[{"a": 1}, "b"]'])(
+			"should throw exception for %j",
+			input => {
+				//given
+				mockInput(input);
 
-			//when
-			//then
-			expect(() => getJsonInput("foo")).toThrow(Error);
-		});
+				//when
+				//then
+				expect(() => getJsonInput("foo")).toThrow(Error);
+			}
+		);
 	});
 
 	describe("getListInput", () => {

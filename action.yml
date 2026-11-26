@@ -23,7 +23,7 @@ inputs:
     required: false
     description: "SHA256 fingerprint of the server host key, the connection is rejected when it does not match"
   envs:
-    description: "Environment variables passed to the shell script"
+    description: "Environment variables passed to the shell script, a json object or a json array of objects that are merged"
   ignoredEnvs:
     description: "Environment variables that are ommited from passing to the shell"
   command:
