@@ -1,20 +1,28 @@
-import {ConfigInterface, ConfigManager} from "../ConfigManager";
+import {ConfigInterface, ConfigManager} from "../ConfigManager.js";
+import {afterEach, beforeEach, describe, expect, test, vi} from "vitest";
 import * as core from "@actions/core";
+
+vi.mock("@actions/core");
+
+beforeEach(() => {
+	vi.mocked(core.getInput).mockReturnValue("");
+	vi.mocked(core.getMultilineInput).mockReturnValue([]);
+});
+
+afterEach(() => {
+	vi.resetAllMocks();
+});
 
 describe("ConfigManager", () => {
 	let configManager: ConfigManager;
 
-	beforeAll(() => {
+	beforeEach(() => {
 		configManager = new ConfigManager(false);
-	});
-
-	afterEach(() => {
-		jest.restoreAllMocks();
 	});
 
 	test("validate should throw exception if config.host or config.user is falsy or config.command is empty", () => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce("");
+		vi.mocked(core.getInput).mockReturnValueOnce("");
 		Object.defineProperty(configManager, "config", {
 			get: () =>
 				({
@@ -31,7 +39,7 @@ describe("ConfigManager", () => {
 
 	test("validate should throw exception if config.password and config.key is falsy", () => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce("d");
+		vi.mocked(core.getInput).mockReturnValueOnce("d");
 		Object.defineProperty(configManager, "config", {
 			get: () =>
 				({
@@ -50,7 +58,7 @@ describe("ConfigManager", () => {
 
 	test("constructor should set tty when input tty is true", () => {
 		//given
-		jest.spyOn(core, "getInput").mockImplementation((name: string) => {
+		vi.mocked(core.getInput).mockImplementation((name: string) => {
 			switch (name) {
 				case "host":
 					return "example.com";
@@ -76,7 +84,7 @@ describe("ConfigManager", () => {
 					return "";
 			}
 		});
-		jest.spyOn(core, "getMultilineInput").mockReturnValueOnce(["echo ok"]);
+		vi.mocked(core.getMultilineInput).mockReturnValueOnce(["echo ok"]);
 
 		//when
 		const manager = new ConfigManager(false);
@@ -86,8 +94,8 @@ describe("ConfigManager", () => {
 	});
 
 	const mockInputs = (inputs: Record<string, string>): void => {
-		jest.spyOn(core, "getInput").mockImplementation((name: string) => inputs[name] ?? "");
-		jest.spyOn(core, "getMultilineInput").mockReturnValue(["echo ok"]);
+		vi.mocked(core.getInput).mockImplementation((name: string) => inputs[name] ?? "");
+		vi.mocked(core.getMultilineInput).mockReturnValue(["echo ok"]);
 	};
 
 	const validInputs = {host: "example.com", port: "22", user: "root", key: "key"};
@@ -123,8 +131,8 @@ describe("ConfigManager", () => {
 	test("constructor should not export envs to the runner or log their values", () => {
 		//given
 		mockInputs({...validInputs, envs: JSON.stringify({TOKEN: "super-secret"})});
-		const exportVariableMock = jest.spyOn(core, "exportVariable");
-		const debugMock = jest.spyOn(core, "debug").mockImplementation(() => undefined);
+		const exportVariableMock = vi.mocked(core.exportVariable);
+		const debugMock = vi.mocked(core.debug).mockImplementation(() => undefined);
 
 		//when
 		new ConfigManager();

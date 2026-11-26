@@ -3,7 +3,7 @@ import prettierRecommended from "eslint-plugin-prettier/recommended";
 
 export default tseslint.config(
 	{
-		ignores: ["dist/", "lib/", "coverage/", "node_modules/", "jest.config.js", "eslint.config.mjs"],
+		ignores: ["dist/", "lib/", "coverage/", "node_modules/", "eslint.config.mjs"],
 	},
 	...tseslint.configs.recommended,
 	prettierRecommended,

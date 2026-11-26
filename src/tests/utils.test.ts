@@ -1,5 +1,6 @@
+import {describe, expect, test} from "vitest";
 import {createHash} from "crypto";
-import {buildScript, getFingerprint, matchesFingerprint, shellQuote} from "../utils";
+import {buildScript, getFingerprint, matchesFingerprint, shellQuote} from "../utils.js";
 
 describe("utils", () => {
 	test.each([

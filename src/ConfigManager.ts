@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import validator from "validator";
-import {InputParser} from "./InputParser";
+import {InputParser} from "./InputParser.js";
 
 export interface ConfigInterface {
 	host: string;

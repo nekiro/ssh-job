@@ -1,12 +1,24 @@
+import {afterEach, beforeEach, describe, expect, test, vi} from "vitest";
 import * as core from "@actions/core";
-import {InputParser} from "../InputParser";
+import {InputParser} from "../InputParser.js";
+
+vi.mock("@actions/core");
+
+beforeEach(() => {
+	vi.mocked(core.getInput).mockReturnValue("");
+	vi.mocked(core.getMultilineInput).mockReturnValue([]);
+});
+
+afterEach(() => {
+	vi.resetAllMocks();
+});
 
 describe("InputParser", () => {
 	test("getMultilineString should call core.getMultilineInput with given name and return what core.getMultilineInput returns", () => {
 		//given
 		const mockResponse = [""];
 		const mockName = "anything";
-		const getMultilineInputMock = jest.spyOn(core, "getMultilineInput").mockReturnValueOnce(mockResponse);
+		const getMultilineInputMock = vi.mocked(core.getMultilineInput).mockReturnValueOnce(mockResponse);
 
 		//when
 		const result = InputParser.getMultilineString(mockName);
@@ -20,7 +32,7 @@ describe("InputParser", () => {
 		//given
 		const mockResponse = "";
 		const mockName = "anything";
-		const getInputMock = jest.spyOn(core, "getInput").mockReturnValueOnce(mockResponse);
+		const getInputMock = vi.mocked(core.getInput).mockReturnValueOnce(mockResponse);
 
 		//when
 		const result = InputParser.getString(mockName);
@@ -35,7 +47,7 @@ describe("InputParser", () => {
 		{input: JSON.stringify({foo: "foo", bar: true}), output: {foo: "foo", bar: true}},
 	])("getJsonFormatted should return proper output for given input", ({input, output}) => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		const result = InputParser.getJsonFormatted("foo");
@@ -52,7 +64,7 @@ describe("InputParser", () => {
 		{input: "foo,,bar,", output: ["foo", "bar"]},
 	])("getStringArray should return proper output for given input", ({input, output}) => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		const result = InputParser.getStringArray("foo");
@@ -69,7 +81,7 @@ describe("InputParser", () => {
 		{input: "", defautValue: true},
 	])("getBoolean should return proper output for given input", ({input, output, defautValue}) => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		const result = InputParser.getBoolean("foo", defautValue);
@@ -80,7 +92,7 @@ describe("InputParser", () => {
 
 	test.each(["yes", "True", "2"])("getBoolean should throw exception for %j", input => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		//then
@@ -92,7 +104,7 @@ describe("InputParser", () => {
 		{input: "5555", output: 5555},
 	])("getNumber should return proper output for given input", ({input, output}) => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		const result = InputParser.getNumber("foo");
@@ -103,7 +115,7 @@ describe("InputParser", () => {
 
 	test.each(["abc", "22abc", "1.5"])("getNumber should throw exception for %j", input => {
 		//given
-		jest.spyOn(core, "getInput").mockReturnValueOnce(input);
+		vi.mocked(core.getInput).mockReturnValueOnce(input);
 
 		//when
 		//then

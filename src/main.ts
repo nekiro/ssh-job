@@ -1,7 +1,8 @@
+import "./cjsGlobals.js";
 import * as core from "@actions/core";
-import {ConfigManager} from "./ConfigManager";
+import {ConfigManager} from "./ConfigManager.js";
 import {NodeSSH, Config, SSHExecCommandOptions} from "node-ssh";
-import {buildScript, getFingerprint, matchesFingerprint, shellQuote} from "./utils";
+import {buildScript, getFingerprint, matchesFingerprint, shellQuote} from "./utils.js";
 
 const SHELL = "bash --noprofile --norc";
 
