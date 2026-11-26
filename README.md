@@ -42,7 +42,7 @@ Store the `SHA256:...` part as a secret and pass it to the action:
 
 ```yml
 - name: deploy
-  uses: nekiro/ssh-job@main
+  uses: nekiro/ssh-job@v2
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
@@ -53,13 +53,13 @@ Store the `SHA256:...` part as a secret and pass it to the action:
 
 ## Examples
 
-The examples use `@main` for brevity. Pin the action to a release tag or a commit SHA in your workflows, so a change in this repository can not alter your deployment without your review.
+`@v2` follows the latest 2.x release. Pin the action to a full version tag or a commit SHA if you want to review every update before it reaches your deployment.
 
 Authorize with ssh private key and execute some commands
 
 ```yml
 - name: create-directory
-  uses: nekiro/ssh-job@main
+  uses: nekiro/ssh-job@v2
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
@@ -79,7 +79,7 @@ Names of envs can contain only letters, digits and underscores. Values that are 
 
 ```yml
 - name: create-directory
-  uses: nekiro/ssh-job@main
+  uses: nekiro/ssh-job@v2
   with:
     host: ${{ secrets.HOST }}
     key: ${{ secrets.KEY }}
