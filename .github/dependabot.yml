@@ -18,3 +18,12 @@ updates:
         dependency-type: production
       development:
         dependency-type: development
+    ignore:
+      # types must match the Node.js version the action runs on (see action.yml)
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # jest 30 depends on vulnerable glob and minimatch versions
+      - dependency-name: "jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jest"
+        update-types: ["version-update:semver-major"]
