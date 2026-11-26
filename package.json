@@ -26,8 +26,8 @@
 	"author": "Marcin Jałocha",
 	"license": "MIT",
 	"dependencies": {
-		"@actions/core": "^1.11.1",
-		"node-ssh": "^13.2.1",
+		"@actions/core": "^3.0.1",
+		"node-ssh": "^14.0.0",
 		"validator": "^13.15.35"
 	},
 	"devDependencies": {
