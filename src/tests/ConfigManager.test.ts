@@ -1,8 +1,6 @@
 import {ConfigInterface, ConfigManager} from "../ConfigManager";
 import * as core from "@actions/core";
 
-//TODO: write tests for parsing
-
 describe("ConfigManager", () => {
 	let configManager: ConfigManager;
 
@@ -38,6 +36,7 @@ describe("ConfigManager", () => {
 			get: () =>
 				({
 					host: "domain",
+					port: 22,
 					user: "foo",
 					password: "",
 					key: "",
@@ -46,7 +45,7 @@ describe("ConfigManager", () => {
 
 		//when
 		//then
-		expect(configManager.validate).toThrow(Error);
+		expect(configManager.validate).toThrow("Missing credentials");
 	});
 
 	test("constructor should set tty when input tty is true", () => {
@@ -84,5 +83,79 @@ describe("ConfigManager", () => {
 
 		//then
 		expect(manager.config.tty).toBe(true);
+	});
+
+	const mockInputs = (inputs: Record<string, string>): void => {
+		jest.spyOn(core, "getInput").mockImplementation((name: string) => inputs[name] ?? "");
+		jest.spyOn(core, "getMultilineInput").mockReturnValue(["echo ok"]);
+	};
+
+	const validInputs = {host: "example.com", port: "22", user: "root", key: "key"};
+
+	test.each(["0", "65536", "-1", ""])("validate should throw exception if port is %j", port => {
+		//given
+		mockInputs({...validInputs, port});
+
+		//when
+		//then
+		expect(() => new ConfigManager()).toThrow("Invalid port");
+	});
+
+	test("constructor should convert env values to strings and skip ignored envs", () => {
+		//given
+		mockInputs({
+			...validInputs,
+			envs: JSON.stringify({FOO: "foo", PORT: 8080, DEBUG: true, SKIPPED: "x"}),
+			ignoredEnvs: "SKIPPED, OTHER",
+		});
+
+		//when
+		const manager = new ConfigManager();
+
+		//then
+		expect(manager.config.envs).toStrictEqual([
+			{key: "FOO", value: "foo"},
+			{key: "PORT", value: "8080"},
+			{key: "DEBUG", value: "true"},
+		]);
+	});
+
+	test("constructor should not export envs to the runner or log their values", () => {
+		//given
+		mockInputs({...validInputs, envs: JSON.stringify({TOKEN: "super-secret"})});
+		const exportVariableMock = jest.spyOn(core, "exportVariable");
+		const debugMock = jest.spyOn(core, "debug").mockImplementation(() => undefined);
+
+		//when
+		new ConfigManager();
+
+		//then
+		expect(exportVariableMock).not.toHaveBeenCalled();
+		expect(debugMock.mock.calls.flat().join(" ")).not.toContain("super-secret");
+	});
+
+	test.each(["FOO;reboot", "FOO BAR", "1FOO", "FOO=x", "$(id)", ""])(
+		"constructor should throw exception if env name is %j",
+		key => {
+			//given
+			mockInputs({...validInputs, envs: JSON.stringify({[key]: "value"})});
+
+			//when
+			//then
+			expect(() => new ConfigManager()).toThrow("Invalid env name");
+		}
+	);
+
+	test.each(["not json", "[1,2]", '"text"', "null"])("constructor should throw exception if envs is %j", envs => {
+		//given
+		mockInputs({...validInputs, envs});
+
+		//when
+		//then
+		expect(() => new ConfigManager()).toThrow("Envs variable must be a json formatted string");
+	});
+
+	test.each(["passphrase", "port", "fingerprint"])("exportIgnoredEnvs should contain %s", name => {
+		expect(ConfigManager.exportIgnoredEnvs).toContain(name);
 	});
 });

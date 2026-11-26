@@ -1,46 +1,67 @@
 import * as core from "@actions/core";
 import {ConfigManager} from "./ConfigManager";
 import {NodeSSH, Config, SSHExecCommandOptions} from "node-ssh";
+import {buildScript, getFingerprint, matchesFingerprint, shellQuote} from "./utils";
+
+const SHELL = "bash --noprofile --norc";
 
 async function run(): Promise<void> {
 	const ssh = new NodeSSH();
 
 	try {
 		const configManager = new ConfigManager();
+		const {config} = configManager;
 
 		const sshConfig: Config = {
-			host: configManager.config.host,
-			port: configManager.config.port,
-			username: configManager.config.user,
+			host: config.host,
+			port: config.port,
+			username: config.user,
+			keepaliveInterval: 15000,
 		};
 
-		if (configManager.config.key) {
-			sshConfig.privateKey = configManager.config.key;
-			if (configManager.config.passphrase) {
-				sshConfig.passphrase = configManager.config.passphrase;
+		if (config.key) {
+			sshConfig.privateKey = config.key;
+			if (config.passphrase) {
+				sshConfig.passphrase = config.passphrase;
 			}
 		} else {
-			sshConfig.password = configManager.config.password;
+			sshConfig.password = config.password;
+		}
+
+		let rejectedFingerprint = "";
+		if (config.fingerprint) {
+			sshConfig.hostVerifier = (hostKey: Buffer): boolean => {
+				if (matchesFingerprint(hostKey, config.fingerprint)) {
+					return true;
+				}
+				rejectedFingerprint = getFingerprint(hostKey);
+				return false;
+			};
+		} else {
+			core.warning(
+				"Host key is not verified, set the fingerprint input to protect the connection from man-in-the-middle attacks"
+			);
 		}
 
 		// initlaize ssh
-		await ssh.connect(sshConfig);
+		try {
+			await ssh.connect(sshConfig);
+		} catch (error) {
+			if (rejectedFingerprint) {
+				throw new Error(`Host key verification failed, server presented ${rejectedFingerprint}`);
+			}
+			throw error;
+		}
 
 		core.info("Connection estabilished...");
 
 		// ignore action inputs when needed
 		const ignoredEnvKeys = new Set(ConfigManager.exportIgnoredEnvs.map(key => key.toLowerCase()));
-		const envs = configManager.config.exportActionOptions
-			? configManager.config.envs
-			: configManager.config.envs.filter(({key}) => !ignoredEnvKeys.has(key.toLowerCase()));
+		const envs = config.exportActionOptions
+			? config.envs
+			: config.envs.filter(({key}) => !ignoredEnvKeys.has(key.toLowerCase()));
 
-		const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
-		const exportLines = envs.map(({key, value}) => `export ${key}=${shellQuote(value)}`);
-		const scriptLines = ["set -euo pipefail", ...exportLines, ...configManager.config.command];
-		const script = `${scriptLines.join("\n")}\n`;
-
-		core.info(`Executing commands...`);
-		core.info("########## START ###########");
+		const script = buildScript(envs, config.command);
 
 		let sawStdout = false;
 		let sawStderr = false;
@@ -55,14 +76,31 @@ async function run(): Promise<void> {
 			},
 		};
 
-		if (configManager.config.tty) {
+		let command = `${SHELL} -c 'source /dev/stdin'`;
+
+		if (config.tty) {
+			// A pseudo-terminal echoes its input, which would print the script (and the exported envs) to the log,
+			// so the script is uploaded to a private temporary file first and removed before it starts running.
+			const upload = await ssh.execCommand(`umask 077 && f=$(mktemp) && cat > "$f" && printf %s "$f"`, {
+				stdin: script,
+			});
+			const scriptPath = upload.stdout.trim();
+
+			if (upload.code !== 0 || !scriptPath) {
+				const stderr = upload.stderr?.trim();
+				throw new Error(stderr ? `Failed to upload script: ${stderr}` : "Failed to upload script");
+			}
+
+			command = `${SHELL} -c 'exec 9<"$1"; rm -f -- "$1"; shift; source /dev/fd/9' bash ${shellQuote(scriptPath)}`;
 			execCommandOptions.execOptions = {pty: true};
+		} else {
+			execCommandOptions.stdin = script;
 		}
 
-		const response = await ssh.execCommand("bash --noprofile --norc -c 'source /dev/stdin'", {
-			...execCommandOptions,
-			stdin: script,
-		});
+		core.info(`Executing commands...`);
+		core.info("########## START ###########");
+
+		const response = await ssh.execCommand(command, execCommandOptions);
 
 		if (!sawStdout && response.stdout) {
 			core.info(response.stdout);
@@ -71,7 +109,7 @@ async function run(): Promise<void> {
 			core.error(response.stderr);
 		}
 
-		if (response.code != 0) {
+		if (response.code !== 0) {
 			const stderr = response.stderr?.trim();
 			throw new Error(stderr ? `Command failed: ${stderr}` : "Command failed");
 		}

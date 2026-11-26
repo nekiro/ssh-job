@@ -6,7 +6,7 @@ inputs:
     required: true
     description: "Target machine hostname or ip"
   port:
-    required: true
+    required: false
     description: "Port to use while connecting"
     default: "22"
   key:
@@ -15,9 +15,13 @@ inputs:
     required: false
     description: "Passphrase for the private key"
   user:
+    required: true
     description: "Ssh user"
   password:
     description: "Ssh password"
+  fingerprint:
+    required: false
+    description: "SHA256 fingerprint of the server host key, the connection is rejected when it does not match"
   envs:
     description: "Environment variables passed to the shell script"
   ignoredEnvs:

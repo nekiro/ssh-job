@@ -1,4 +1,5 @@
 import * as core from "@actions/core";
+import validator from "validator";
 import {InputParser} from "./InputParser";
 
 export interface ConfigInterface {
@@ -8,6 +9,7 @@ export interface ConfigInterface {
 	passphrase: string;
 	user: string;
 	password: string;
+	fingerprint: string;
 	envs: {key: string; value: string}[];
 	ignoredEnvs: string[];
 	command: string[];
@@ -18,15 +20,20 @@ export interface ConfigInterface {
 export class ConfigManager {
 	public static readonly exportIgnoredEnvs = [
 		"host",
+		"port",
 		"key",
+		"passphrase",
 		"user",
 		"password",
+		"fingerprint",
 		"command",
 		"ignoredEnvs",
 		"envs",
 		"exportActionOptions",
 		"tty",
 	];
+
+	private static readonly envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 	public readonly config: ConfigInterface;
 
@@ -38,6 +45,7 @@ export class ConfigManager {
 			passphrase: InputParser.getString("passphrase"),
 			user: InputParser.getString("user"),
 			password: InputParser.getString("password"),
+			fingerprint: InputParser.getString("fingerprint"),
 			envs: [],
 			command: InputParser.getMultilineString("command"),
 			ignoredEnvs: InputParser.getStringArray("ignoredEnvs"),
@@ -45,19 +53,26 @@ export class ConfigManager {
 			tty: InputParser.getBoolean("tty", false),
 		};
 
+		let rawEnvs: Record<string, unknown>;
 		try {
-			const rawEnvs = Object.entries(InputParser.getJsonFormatted("envs"));
-
-			rawEnvs.forEach(env => {
-				const [key, value] = env;
-				if (!config.ignoredEnvs.includes(key)) {
-					core.debug(`Registering ${key} ${value} ...`);
-					core.exportVariable(key, value);
-					config.envs.push({key, value});
-				}
-			});
-		} catch (err) {
+			rawEnvs = InputParser.getJsonFormatted("envs");
+		} catch {
 			throw new Error("Envs variable must be a json formatted string, make sure you pass correct values");
+		}
+
+		for (const [key, rawValue] of Object.entries(rawEnvs)) {
+			if (config.ignoredEnvs.includes(key)) {
+				continue;
+			}
+
+			// the key is written into the remote shell script, so it must be a plain variable name
+			if (!ConfigManager.envKeyPattern.test(key)) {
+				throw new Error(`Invalid env name "${key}", only letters, digits and underscores are allowed`);
+			}
+
+			const value = typeof rawValue === "string" ? rawValue : JSON.stringify(rawValue);
+			core.debug(`Registering ${key} ...`);
+			config.envs.push({key, value});
 		}
 
 		this.config = config;
@@ -70,6 +85,10 @@ export class ConfigManager {
 	public validate = (): void => {
 		if (!this.config.host) {
 			throw new Error("Missing host");
+		}
+
+		if (!validator.isInt(String(this.config.port), {min: 1, max: 65535})) {
+			throw new Error("Invalid port, it must be a number between 1 and 65535");
 		}
 
 		if (!this.config.user) {
